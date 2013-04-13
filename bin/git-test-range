@@ -1,0 +1,50 @@
+#! /bin/sh
+
+USAGE="git test-range RANGE COMMAND..."
+
+LONG_USAGE="Run COMMAND for each commit in the specified RANGE in reverse order,
+stopping if the command fails.  The return code is that of the last
+command executed (i.e., 0 only if the command succeeded for every
+commit in the range)."
+
+SUBDIRECTORY_OK=TRUE
+
+. "$(git --exec-path)/git-sh-setup"
+
+if test $# -lt 2
+then
+    usage
+    exit 1
+fi
+
+require_clean_work_tree "test-range"
+
+range="$1"
+shift
+
+head=$(git symbolic-ref HEAD 2>/dev/null || git rev-parse HEAD)
+
+for r in $(git rev-list --reverse "$range")
+do
+    git --no-pager log -1 --decorate $r &&
+    git co $r &&
+    "$@" || {
+        retcode=$?
+        echo
+        echo "*******************************************************************************"
+        echo "FAILED ON COMMIT $r:"
+        echo
+        git --no-pager log -1 --decorate $r
+        echo "*******************************************************************************"
+        echo
+        echo "FAILURE!"
+        exit $retcode
+    }
+done
+
+git checkout -f ${head#refs/heads/}
+
+echo
+echo "ALL TESTS SUCCESSFUL"
+exit 0
+
