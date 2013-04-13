@@ -11,6 +11,14 @@ SUBDIRECTORY_OK=TRUE
 
 . "$(git --exec-path)/git-sh-setup"
 
+test_revision() {
+    r="$1"
+    shift
+    git --no-pager log -1 --decorate $r &&
+    git co $r &&
+    "$@"
+}
+
 if test $# -lt 2
 then
     usage
@@ -26,9 +34,8 @@ head=$(git symbolic-ref HEAD 2>/dev/null || git rev-parse HEAD)
 
 for r in $(git rev-list --reverse "$range")
 do
-    git --no-pager log -1 --decorate $r &&
-    git co $r &&
-    "$@" || {
+    if ! test_revision $r "$@"
+    then
         retcode=$?
         echo
         echo "*******************************************************************************"
@@ -39,7 +46,7 @@ do
         echo
         echo "FAILURE!"
         exit $retcode
-    }
+    fi
 done
 
 git checkout -f ${head#refs/heads/}
