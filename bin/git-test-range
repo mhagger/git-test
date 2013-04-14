@@ -34,9 +34,10 @@ head=$(git symbolic-ref HEAD 2>/dev/null || git rev-parse HEAD)
 
 for r in $(git rev-list --reverse "$range")
 do
-    if ! test_revision $r "$@"
+    test_revision $r "$@"
+    retcode=$?
+    if test $retcode != 0
     then
-        retcode=$?
         echo
         echo "*******************************************************************************"
         echo "FAILED ON COMMIT $r:"
