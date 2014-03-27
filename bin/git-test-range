@@ -9,23 +9,35 @@ commit in the range)."
 
 SUBDIRECTORY_OK=TRUE
 
-NOTES_REF='tests/full'
+notes_ref=
 
 . "$(git --exec-path)/git-sh-setup"
 
 read_note() {
-    r="$1"
-    git notes --ref=$NOTES_REF show "$r^{tree}" ||
-        echo "unknown"
+    if test -z "$notes_ref"
+    then
+	echo "unknown"
+    else
+	r="$1"
+	git notes --ref=$notes_ref show "$r^{tree}" 2>/dev/null ||
+            echo "unknown"
+    fi
 }
 
 write_note() {
+    if test -z "$notes_ref"
+    then
+	return
+    fi
     r="$1"
     value="$2"
-    git notes --ref=$NOTES_REF add "$r^{tree}" -m "$value" || {
-        echo 1>&2 "Error adding notes to $r^{tree}"
-	exit 2
-    }
+    if git notes --ref=$notes_ref add "$r^{tree}" -m "$value"
+    then
+        echo "Marked tree $r^{tree} to be $value"
+    else
+        echo 1>&2 "fatal: error adding note to $r^{tree}"
+        exit 3
+    fi
 }
 
 test_revision() {
@@ -33,19 +45,71 @@ test_revision() {
     shift
     git --no-pager log -1 --decorate $r &&
     git co $r &&
-    "$@"
+    if test -n "$command"
+    then
+        eval "$command"
+    else
+        "$@"
+    fi
 }
 
-if test $# -lt 2
-then
-    usage
-    exit 1
-fi
+setup_test() {
+    echo "setup_test $*"
+    name="$1"
+    notes_ref="tests/$name"
+    command="$(git config --get "test.$name.command")"
+    echo "Using test $name; command: $command"
+}
 
 require_clean_work_tree "test-range"
 
+command=
+while test $# != 0
+do
+    case "$1" in
+        --test)
+            if test $# -lt 2
+            then
+                usage
+                exit 2
+            fi
+            setup_test "$2"
+            shift 2
+            ;;
+        --test=*)
+            setup_test "$(echo "$1" | sed -e 's/^--test=//')"
+            shift
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
+if test $# -lt 1
+then
+    usage
+    exit 2
+fi
+
 range="$1"
 shift
+
+if test $# != 0
+then
+    # Use the rest of the arguments as the test command line.
+    if test -n "$command"
+    then
+        echo "error: both --test and command specified!"
+        exit 2
+    fi
+else
+    if test -z "$name"
+    then
+        setup_test "default"
+    fi
+fi
+
 
 head=$(git symbolic-ref HEAD 2>/dev/null || git rev-parse HEAD)
 
@@ -55,20 +119,20 @@ do
     status="$(read_note $r)"
     echo "Old status: $status"
     case "$status" in
-	"good")
-	    echo "Tree $rs^{tree} is already known to be good."
-	    ;;
-	"bad")
-	    echo "Tree $rs^{tree} is already known to be bad!"
-	    exit 1
-	    ;;
-	"unknown")
+        "good")
+            echo "Tree $rs^{tree} is already known to be good."
+            ;;
+        "bad")
+            echo "Tree $rs^{tree} is already known to be bad!"
+            exit 1
+            ;;
+        "unknown")
             test_revision $r "$@"
             retcode=$?
             if test $retcode = 0
             then
-		write_note $r "good"
-	    else
+                write_note $r "good"
+            else
                 echo
                 echo "*******************************************************************************"
                 echo "FAILED ON COMMIT $r"
@@ -77,14 +141,14 @@ do
                 echo "*******************************************************************************"
                 echo
                 echo "FAILURE!"
-		write_note $r "bad"
+                write_note $r "bad"
                 exit $retcode
             fi
-	    ;;
-	*)
-	    echo "Unknown status for tree $rs^{tree}!"
-	    exit 2
-	    ;;
+            ;;
+        *)
+            echo 1>&2 "fatal: unrecognized status for tree $rs^{tree}!"
+            exit 3
+            ;;
     esac
 done
 
