@@ -9,7 +9,24 @@ commit in the range)."
 
 SUBDIRECTORY_OK=TRUE
 
+NOTES_REF='tests/full'
+
 . "$(git --exec-path)/git-sh-setup"
+
+read_note() {
+    r="$1"
+    git notes --ref=$NOTES_REF show "$r^{tree}" ||
+        echo "unknown"
+}
+
+write_note() {
+    r="$1"
+    value="$2"
+    git notes --ref=$NOTES_REF add "$r^{tree}" -m "$value" || {
+        echo 1>&2 "Error adding notes to $r^{tree}"
+	exit 2
+    }
+}
 
 test_revision() {
     r="$1"
@@ -34,20 +51,40 @@ head=$(git symbolic-ref HEAD 2>/dev/null || git rev-parse HEAD)
 
 for r in $(git rev-list --reverse "$range")
 do
-    test_revision $r "$@"
-    retcode=$?
-    if test $retcode != 0
-    then
-        echo
-        echo "*******************************************************************************"
-        echo "FAILED ON COMMIT $r"
-        echo
-        git --no-pager log -1 --decorate $r
-        echo "*******************************************************************************"
-        echo
-        echo "FAILURE!"
-        exit $retcode
-    fi
+    status="$(read_note $r)"
+    echo "Old status: $status"
+    case "$status" in
+	"good")
+	    echo "Tree $r^{tree} is already known to be good."
+	    ;;
+	"bad")
+	    echo "Tree $r^{tree} is already known to be bad!"
+	    exit 1
+	    ;;
+	"unknown")
+            test_revision $r "$@"
+            retcode=$?
+            if test $retcode = 0
+            then
+		write_note $r "good"
+	    else
+                echo
+                echo "*******************************************************************************"
+                echo "FAILED ON COMMIT $r"
+                echo
+                git --no-pager log -1 --decorate $r
+                echo "*******************************************************************************"
+                echo
+                echo "FAILURE!"
+		write_note $r "bad"
+                exit $retcode
+            fi
+	    ;;
+	*)
+	    echo "Unknown status for tree $r^{tree}!"
+	    exit 2
+	    ;;
+    esac
 done
 
 git checkout -f ${head#refs/heads/}
