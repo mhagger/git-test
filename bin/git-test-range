@@ -51,14 +51,15 @@ head=$(git symbolic-ref HEAD 2>/dev/null || git rev-parse HEAD)
 
 for r in $(git rev-list --reverse "$range")
 do
+    rs="$(git rev-parse --short "$r")"
     status="$(read_note $r)"
     echo "Old status: $status"
     case "$status" in
 	"good")
-	    echo "Tree $r^{tree} is already known to be good."
+	    echo "Tree $rs^{tree} is already known to be good."
 	    ;;
 	"bad")
-	    echo "Tree $r^{tree} is already known to be bad!"
+	    echo "Tree $rs^{tree} is already known to be bad!"
 	    exit 1
 	    ;;
 	"unknown")
@@ -81,7 +82,7 @@ do
             fi
 	    ;;
 	*)
-	    echo "Unknown status for tree $r^{tree}!"
+	    echo "Unknown status for tree $rs^{tree}!"
 	    exit 2
 	    ;;
     esac
