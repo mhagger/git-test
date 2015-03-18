@@ -16,10 +16,10 @@ notes_ref=
 read_note() {
     if test -z "$notes_ref"
     then
-	echo "unknown"
+        echo "unknown"
     else
-	r="$1"
-	git notes --ref=$notes_ref show "$r^{tree}" 2>/dev/null ||
+        r="$1"
+        git notes --ref=$notes_ref show "$r^{tree}" 2>/dev/null ||
             echo "unknown"
     fi
 }
@@ -27,7 +27,7 @@ read_note() {
 write_note() {
     if test -z "$notes_ref"
     then
-	return
+        return
     fi
     r="$1"
     value="$2"
@@ -36,6 +36,19 @@ write_note() {
         echo "Marked tree $r^{tree} to be $value"
     else
         echo 1>&2 "fatal: error adding note to $r^{tree}"
+        exit 3
+    fi
+}
+
+forget_note() {
+    if test -z "$notes_ref"
+    then
+        return
+    fi
+    r="$1"
+    if ! git notes --ref=$notes_ref remove --ignore-missing "$r^{tree}"
+    then
+        echo 1>&2 "fatal: error removing note from $r^{tree}"
         exit 3
     fi
 }
@@ -64,6 +77,8 @@ setup_test() {
 require_clean_work_tree "test-range"
 
 command=
+force=false
+forget=false
 while test $# != 0
 do
     case "$1" in
@@ -78,6 +93,14 @@ do
             ;;
         --test=*)
             setup_test "$(echo "$1" | sed -e 's/^--test=//')"
+            shift
+            ;;
+        --force|-f)
+            force=true
+            shift
+            ;;
+        --forget)
+            forget=true
             shift
             ;;
         *)
@@ -112,6 +135,19 @@ fi
 
 
 head=$(git symbolic-ref HEAD 2>/dev/null || git rev-parse HEAD)
+
+if $force || $forget
+then
+    for r in $(git rev-list --reverse "$range")
+    do
+	forget_note $r
+    done
+
+    if $forget
+    then
+	exit 0
+    fi
+fi
 
 for r in $(git rev-list --reverse "$range")
 do
