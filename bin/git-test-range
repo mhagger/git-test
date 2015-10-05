@@ -1,6 +1,6 @@
 #! /bin/sh
 
-USAGE="git test-range RANGE COMMAND..."
+USAGE="git test-range [--test=NAME] [--force|-f] [--forget] RANGE [-- [COMMAND]]..."
 
 LONG_USAGE="Run COMMAND for each commit in the specified RANGE in reverse order,
 stopping if the command fails.  The return code is that of the last
@@ -115,8 +115,20 @@ then
     exit 2
 fi
 
-range="$1"
-shift
+range=
+while test $# != 0
+do
+    case "$1" in
+	--)
+	    shift
+	    break
+	    ;;
+	*)
+	    range="$range $1"
+	    shift
+	    ;;
+    esac
+done
 
 if test $# != 0
 then
@@ -138,7 +150,7 @@ head=$(git symbolic-ref HEAD 2>/dev/null || git rev-parse HEAD)
 
 if $force || $forget
 then
-    for r in $(git rev-list --reverse "$range")
+    for r in $(git rev-list --reverse $range)
     do
 	forget_note $r
     done
@@ -149,7 +161,7 @@ then
     fi
 fi
 
-for r in $(git rev-list --reverse "$range")
+for r in $(git rev-list --reverse $range)
 do
     rs="$(git rev-parse --short "$r")"
     status="$(read_note $r)"
