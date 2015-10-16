@@ -21,14 +21,28 @@ notes_ref=
 
 . "$(git --exec-path)/git-sh-setup"
 
-read_note() {
+read_status() {
     if test -z "$notes_ref"
     then
         echo "unknown"
     else
-        r="$1"
-        git notes --ref=$notes_ref show "$r^{tree}" 2>/dev/null ||
+        local r="$1"
+        local status
+        if ! status="$(git notes --ref=$notes_ref show "$r^{tree}" 2>/dev/null)"
+        then
             echo "unknown"
+            return
+        fi
+
+        case "$status" in
+            good|bad)
+                echo "$status"
+                ;;
+            *)
+                echo 1>&2 "fatal: unrecognized status for tree $r^{tree}!"
+                exit 3
+                ;;
+        esac
     fi
 }
 
@@ -205,7 +219,7 @@ fail_count=0
 for r in $(git rev-list --reverse $range)
 do
     rs="$(git rev-parse --short "$r")"
-    status="$(read_note $r)"
+    status="$(read_status $r)"
     echo "Old status: $status"
     case "$status" in
         "good")
