@@ -11,6 +11,7 @@ Options:
 
 --forget: forget any existing test results for the range.
 --force | -f: forget any existing test results for the range and test it again.
+--retest: if any commit in the range is marked as 'bad', try testing it again.
 --keep-going | -k: if a commit fails the test, continue testing other commits
                    rather than aborting.
 "
@@ -55,7 +56,7 @@ write_note() {
     fi
     r="$1"
     value="$2"
-    if git notes --ref=$notes_ref add "$r^{tree}" -m "$value"
+    if git notes --ref=$notes_ref add -f "$r^{tree}" -m "$value"
     then
         echo "Marked tree $r^{tree} to be $value"
     else
@@ -130,6 +131,7 @@ require_clean_work_tree "test-range"
 command=
 force=false
 forget=false
+retest=false
 keep_going=false
 while test $# != 0
 do
@@ -153,6 +155,10 @@ do
             ;;
         --forget)
             forget=true
+            shift
+            ;;
+        --retest)
+            retest=true
             shift
             ;;
         --keep-going|-k)
@@ -223,37 +229,45 @@ do
     rs="$(git rev-parse --short "$r")"
     status="$(read_status $r $rs)"
     echo "Old status: $status"
-    case "$status" in
-        "good")
-            echo "Tree $rs^{tree} is already known to be good."
-            ;;
-        "bad")
+
+    if test "$status" = "good"
+    then
+        echo "Tree $rs^{tree} is already known to be good."
+        continue
+    fi
+
+    if test "$status" = "bad"
+    then
+        if $retest
+        then
+            echo "Tree $rs^{tree} was previously tested to be bad; retesting..."
+            status="unknown"
+            # fall through
+        else
             echo "Tree $rs^{tree} is already known to be bad!"
-            if $keep_going
-            then
-                fail_count=$((fail_count + 1))
-            else
-                exit 1
-            fi
-            ;;
-        "unknown")
-            test_and_record $r "$@"
-            retcode=$?
-            if test $retcode != 0
-            then
-                if $keep_going
-                then
-                    fail_count=$((fail_count + 1))
-                else
-                    exit $retcode
-                fi
-            fi
-            ;;
-        *)
-            echo 1>&2 "fatal: unrecognized status for tree $rs^{tree}!"
-            exit 3
-            ;;
-    esac
+            status="failed"
+            retcode=1
+        fi
+    fi
+
+    if test "$status" = "unknown"
+    then
+        test_and_record $r "$@"
+        retcode=$?
+        if test $retcode = 0
+        then
+            continue
+        fi
+    fi
+
+    # This commit has failed the test.
+    if $keep_going
+    then
+        fail_count=$((fail_count + 1))
+        continue
+    else
+        exit $retcode
+    fi
 done
 
 git checkout -f ${head#refs/heads/}
