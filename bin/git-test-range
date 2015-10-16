@@ -71,6 +71,11 @@ setup_test() {
     name="$1"
     notes_ref="tests/$name"
     command="$(git config --get "test.$name.command")"
+    if test -z "$command"
+    then
+        echo 1>&2 "fatal: test $name is not defined!"
+        exit 2
+    fi
     echo "Using test $name; command: $command"
 }
 
