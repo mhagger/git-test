@@ -119,14 +119,14 @@ range=
 while test $# != 0
 do
     case "$1" in
-	--)
-	    shift
-	    break
-	    ;;
-	*)
-	    range="$range $1"
-	    shift
-	    ;;
+        --)
+            shift
+            break
+            ;;
+        *)
+            range="$range $1"
+            shift
+            ;;
     esac
 done
 
@@ -152,12 +152,12 @@ if $force || $forget
 then
     for r in $(git rev-list --reverse $range)
     do
-	forget_note $r
+        forget_note $r
     done
 
     if $forget
     then
-	exit 0
+        exit 0
     fi
 fi
 
