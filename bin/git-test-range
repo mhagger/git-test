@@ -29,6 +29,7 @@ read_status() {
     fi
 
     local r="$1"
+    local rs="$2"
     local status
     if ! status="$(git notes --ref=$notes_ref show "$r^{tree}" 2>/dev/null)"
     then
@@ -41,7 +42,7 @@ read_status() {
             echo "$status"
             ;;
         *)
-            echo 1>&2 "fatal: unrecognized status for tree $r^{tree}!"
+            echo 1>&2 "fatal: unrecognized status for tree $rs^{tree}!"
             exit 3
             ;;
     esac
@@ -220,7 +221,7 @@ fail_count=0
 for r in $(git rev-list --reverse $range)
 do
     rs="$(git rev-parse --short "$r")"
-    status="$(read_status $r)"
+    status="$(read_status $r $rs)"
     echo "Old status: $status"
     case "$status" in
         "good")
