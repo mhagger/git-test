@@ -72,6 +72,28 @@ test_revision() {
     fi
 }
 
+test_and_record() {
+    local r="$1"
+    shift
+    test_revision $r "$@"
+    local retcode=$?
+    if test $retcode = 0
+    then
+        write_note $r "good"
+    else
+        echo
+        echo "*******************************************************************************"
+        echo "FAILED ON COMMIT $r"
+        echo
+        git --no-pager log -1 --decorate $r
+        echo "*******************************************************************************"
+        echo
+        echo "FAILURE!"
+        write_note $r "bad"
+        return $retcode
+    fi
+}
+
 setup_test() {
     echo "setup_test $*"
     name="$1"
@@ -186,21 +208,10 @@ do
             exit 1
             ;;
         "unknown")
-            test_revision $r "$@"
+            test_and_record $r "$@"
             retcode=$?
-            if test $retcode = 0
+            if test $retcode != 0
             then
-                write_note $r "good"
-            else
-                echo
-                echo "*******************************************************************************"
-                echo "FAILED ON COMMIT $r"
-                echo
-                git --no-pager log -1 --decorate $r
-                echo "*******************************************************************************"
-                echo
-                echo "FAILURE!"
-                write_note $r "bad"
                 exit $retcode
             fi
             ;;
