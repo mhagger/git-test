@@ -11,6 +11,8 @@ Options:
 
 --forget: forget any existing test results for the range.
 --force | -f: forget any existing test results for the range and test it again.
+--keep-going | -k: if a commit fails the test, continue testing other commits
+                   rather than aborting.
 "
 
 SUBDIRECTORY_OK=TRUE
@@ -112,6 +114,7 @@ require_clean_work_tree "test-range"
 command=
 force=false
 forget=false
+keep_going=false
 while test $# != 0
 do
     case "$1" in
@@ -134,6 +137,10 @@ do
             ;;
         --forget)
             forget=true
+            shift
+            ;;
+        --keep-going|-k)
+            keep_going=true
             shift
             ;;
         *)
@@ -194,6 +201,7 @@ then
     fi
 fi
 
+fail_count=0
 for r in $(git rev-list --reverse $range)
 do
     rs="$(git rev-parse --short "$r")"
@@ -205,14 +213,24 @@ do
             ;;
         "bad")
             echo "Tree $rs^{tree} is already known to be bad!"
-            exit 1
+            if $keep_going
+            then
+                fail_count=$((fail_count + 1))
+            else
+                exit 1
+            fi
             ;;
         "unknown")
             test_and_record $r "$@"
             retcode=$?
             if test $retcode != 0
             then
-                exit $retcode
+                if $keep_going
+                then
+                    fail_count=$((fail_count + 1))
+                else
+                    exit $retcode
+                fi
             fi
             ;;
         *)
@@ -225,6 +243,18 @@ done
 git checkout -f ${head#refs/heads/}
 
 echo
-echo "ALL TESTS SUCCESSFUL"
-exit 0
+case $fail_count in
+    0)
+        echo "ALL TESTS SUCCESSFUL"
+        exit 0
+        ;;
+    1)
+        echo "!!! $fail_count TEST FAILED !!!"
+        exit 1
+        ;;
+    *)
+        echo "!!! $fail_count TESTS FAILED !!!"
+        exit 1
+        ;;
+esac
 
