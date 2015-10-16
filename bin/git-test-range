@@ -1,11 +1,17 @@
 #! /bin/sh
 
-USAGE="git test-range [--test=NAME] [--force|-f] [--forget] RANGE [-- [COMMAND]]..."
+USAGE="git test-range [--test=NAME] OPTS RANGE [-- [COMMAND]]..."
 
 LONG_USAGE="Run COMMAND for each commit in the specified RANGE in reverse order,
 stopping if the command fails.  The return code is that of the last
 command executed (i.e., 0 only if the command succeeded for every
-commit in the range)."
+commit in the range).
+
+Options:
+
+--forget: forget any existing test results for the range.
+--force | -f: forget any existing test results for the range and test it again.
+"
 
 SUBDIRECTORY_OK=TRUE
 
