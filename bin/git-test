@@ -1,0 +1,519 @@
+#!/usr/bin/env python
+# -*- mode: python; coding: utf-8 -*-
+
+# Copyright (c) 2013-2016 Michael Haggerty
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, see <http://www.gnu.org/licenses/>
+
+# Run "git test --help for the documentation.
+#
+# The project's main repository is located at
+#
+#     https://github.com/mhagger/git-test
+
+"""Run tests within a Git project and remember the test results.
+
+`git test` consists of a few things:
+
+* A way of defining tests for a Git project. The commands to be run
+  for a particular test are stored in the repository's Git
+  configuration.
+
+* Tools for running such tests against single Git commits or against a
+  range of commits.
+
+* A scheme for storing the results of such tests as git notes. The
+  results are connected to the tree of the commit that was tested, so
+  the test results remain valid across some types of merges, rebases,
+  etc.
+
+* The intelligence not to re-run a test whose results are already
+  known.
+
+Example: make sure that all commits on a feature branch pass the tests
+implied by `make -j16 test` (run the tests in a worktree to avoid
+tying up your main repository):
+
+    $ git config test.full.command 'make -j16 test'
+    $ git worktree add --detach ../tests feature
+    $ cd ../tests
+    $ git test range --test=full master..feature
+
+Any time you make changes to the feature branch in your main
+repository, you can re-run the last command in the `tests` worktree.
+It will only test commits with trees that it hasn't been seen before.
+
+"""
+
+USAGE = r"""\
+git test range [--test=NAME] OPTS RANGE [-- [COMMAND]]...
+"""
+
+LONG_USAGE = r"""\
+Run COMMAND for each commit in the specified RANGE in reverse order,
+stopping if the command fails.  The return code is that of the last
+command executed (i.e., 0 only if the command succeeded for every
+commit in the range).
+
+Options:
+
+--forget: forget any existing test results for the range.
+--force | -f: forget any existing test results for the range and test it again.
+--retest: if any commit in the range is marked as 'bad', try testing it again.
+--keep-going | -k: if a commit fails the test, continue testing other commits
+                   rather than aborting.
+"""
+
+import locale
+import sys
+import re
+import subprocess
+import argparse
+
+
+if not (0x02060000 <= sys.hexversion):
+    sys.exit('Python version 2.6 or later is required')
+
+
+PREFERRED_ENCODING = locale.getpreferredencoding()
+
+
+from subprocess import check_call
+
+# Backwards compatibility:
+try:
+    from subprocess import CalledProcessError
+except ImportError:
+    # Use definition from Python 2.7 subprocess module:
+    class CalledProcessError(Exception):
+        def __init__(self, returncode, cmd, output=None):
+            self.returncode = returncode
+            self.cmd = cmd
+            self.output = output
+        def __str__(self):
+            return "Command '%s' returned non-zero exit status %d" % (self.cmd, self.returncode)
+
+try:
+    from subprocess import check_output
+except ImportError:
+    # Use definition from Python 2.7 subprocess module:
+    def check_output(*popenargs, **kwargs):
+        if 'stdout' in kwargs:
+            raise ValueError('stdout argument not allowed, it will be overridden.')
+        process = subprocess.Popen(stdout=subprocess.PIPE, *popenargs, **kwargs)
+        output, unused_err = process.communicate()
+        retcode = process.poll()
+        if retcode:
+            cmd = kwargs.get("args")
+            if cmd is None:
+                cmd = popenargs[0]
+            try:
+                raise CalledProcessError(retcode, cmd, output=output)
+            except TypeError:
+                # Python 2.6's CalledProcessError has no 'output' kw
+                raise CalledProcessError(retcode, cmd)
+        return output
+
+
+class Failure(Exception):
+    """An exception that indicates a normal failure of the script.
+
+    Failures are reported at top level via sys.exit(str(e)) rather
+    than via a Python stack dump."""
+
+    pass
+
+
+class UncleanWorkTreeError(Failure):
+    pass
+
+
+def communicate(process, input=None):
+    """Return decoded output from process."""
+    if input is not None:
+        input = input.encode(PREFERRED_ENCODING)
+
+    output, error = process.communicate(input)
+
+    output = None if output is None else output.decode(PREFERRED_ENCODING)
+    error = None if error is None else error.decode(PREFERRED_ENCODING)
+
+    return (output, error)
+
+
+def _decode_output(value):
+    """Decodes Git output into a unicode string.
+
+    On Python 2 this is a no-op; on Python 3 we decode the string as
+    suggested by [1] since we know that Git treats paths as just a sequence
+    of bytes and all of the output we ask Git for is expected to be a file
+    system path.
+
+    [1] http://docs.python.org/3/c-api/unicode.html#file-system-encoding
+
+    """
+    if sys.hexversion < 0x3000000:
+        return value
+    return value.decode(sys.getfilesystemencoding(), 'surrogateescape')
+
+
+def check_git_output(*popenargs, **kwargs):
+    return _decode_output(check_output(*popenargs, **kwargs))
+
+
+def rev_parse(arg, abbrev=None):
+    if abbrev:
+        cmd = ['git', 'rev-parse', '--verify', '-q', '--short=%d' % (abbrev,), arg]
+    else:
+        cmd = ['git', 'rev-parse', '--verify', '-q', arg]
+
+    try:
+        return check_git_output(cmd).strip()
+    except CalledProcessError:
+        raise Failure('%r is not a valid commit!' % (arg,))
+
+
+def rev_list(*args):
+    """Iterate over (commit, [parent,...]) for the selected commits.
+
+    args are passed as arguments to "git rev-list" to select which
+    commits should be iterated over.
+
+    """
+
+    process = subprocess.Popen(
+        ['git', 'rev-list'] + list(args) + ['--'],
+        stdout=subprocess.PIPE,
+        )
+    for line in process.stdout:
+        yield _decode_output(line).strip()
+
+    retcode = process.wait()
+    if retcode:
+        raise Failure('git rev-list %s failed' % (' '.join(args),))
+
+
+def refresh_index():
+    process = subprocess.Popen(
+        ['git', 'update-index', '-q', '--ignore-submodules', '--refresh'],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+    out, err = communicate(process)
+    retcode = process.poll()
+    if retcode:
+        raise UncleanWorkTreeError(err.rstrip() or out.rstrip())
+
+
+def unstaged_changes():
+    """Return True iff there are unstaged changes in the working copy"""
+
+    try:
+        check_call(['git', 'diff-files', '--quiet', '--ignore-submodules'])
+        return False
+    except CalledProcessError:
+        return True
+
+
+def uncommitted_changes():
+    """Return True iff the index contains uncommitted changes."""
+
+    try:
+        check_call([
+            'git', 'diff-index', '--cached', '--quiet',
+            '--ignore-submodules', 'HEAD', '--',
+            ])
+        return False
+    except CalledProcessError:
+        return True
+
+
+def require_clean_work_tree(action):
+    """Verify that the current tree is clean.
+
+    The code is a Python translation of the git-sh-setup(1) function
+    of the same name."""
+
+    process = subprocess.Popen(
+        ['git', 'rev-parse', '--verify', 'HEAD'],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+    err = communicate(process)[1]
+    retcode = process.poll()
+    if retcode:
+        raise UncleanWorkTreeError(err.rstrip())
+
+    refresh_index()
+
+    error = []
+    if unstaged_changes():
+        error.append('Cannot %s: You have unstaged changes.' % (action,))
+
+    if uncommitted_changes():
+        if not error:
+            error.append('Cannot %s: Your index contains uncommitted changes.' % (action,))
+        else:
+            error.append('Additionally, your index contains uncommitted changes.')
+
+    if error:
+        raise UncleanWorkTreeError('\n'.join(error))
+
+
+notes_ref = None
+
+def read_status(r, rs):
+    if notes_ref is None:
+        return 'unknown'
+
+    cmd = ['git', 'notes', '--ref=%s' % (notes_ref,), 'show', '%s^{tree}' % (r,)]
+    try:
+        status = check_output(cmd, stderr=open('/dev/null', 'wb')).rstrip()
+    except CalledProcessError:
+        return 'unknown'
+
+    if status not in ['good', 'bad']:
+        sys.exit('fatal: unrecognized status %r for tree %s^{tree}!' % (status, rs))
+
+    return status
+
+
+def write_note(r, value):
+    if notes_ref is None:
+        return
+
+    cmd = [
+        'git', 'notes', '--ref=%s' % (notes_ref,),
+        'add', '-f', '%s^{tree}' % (r,), '-m', value,
+        ]
+    try:
+        check_call(cmd)
+    except CalledProcessError:
+        sys.exit('fatal: error adding note to %s^{tree}' % (r,))
+    else:
+        sys.stderr.write('Marked tree %s^{tree} to be %s\n' % (r, value))
+
+
+def forget_note(r):
+    if notes_ref is None:
+        return
+
+    cmd = [
+        'git', 'notes', '--ref=%s' % (notes_ref,),
+        'remove', '--ignore-missing', '%s^{tree}' % (r,),
+        ]
+
+    try:
+        check_call(cmd)
+    except CalledProcessError:
+        sys.exit('fatal: error removing note from %s^{tree}' % (r,))
+
+
+def test_revision(r, *args):
+    cmd = ['git', '--no-pager', 'log', '-1', '--decorate', r]
+    check_call(cmd)
+
+    cmd = ['git', 'co', r]
+    check_call(cmd)
+
+    if command is not None:
+        cmd = ['sh', '-c', command]
+    else:
+        cmd = list(args)
+
+    check_call(cmd)
+
+
+FAIL_HEADER_TEMPLATE = """\
+
+*******************************************************************************
+FAILED ON COMMIT %(r)s
+
+"""
+
+FAIL_TRAILER_TEMPLATE = """\
+*******************************************************************************
+
+FAILURE!
+"""
+
+def test_and_record(r, *args):
+    try:
+        test_revision(r, *args)
+    except CalledProcessError as e:
+        cmd = ['git', '--no-pager', 'log', '-1', '--decorate', r]
+        sys.stdout.write(FAIL_HEADER_TEMPLATE % dict(r=r))
+        check_call(cmd)
+        sys.stdout.write(FAIL_TRAILER_TEMPLATE % dict())
+        write_note(r, 'bad')
+        raise
+    else:
+        write_note(r, 'good')
+
+
+def setup_test(name):
+    global notes_ref, command
+
+    sys.stdout.write('setup_test %s\n' % (name,))
+
+    notes_ref = 'tests/%s' % (name,)
+    cmd = ['git', 'config', '--get', 'test.%s.command' % (name,)]
+    try:
+        command = check_output(cmd).rstrip()
+    except CalledProcessError:
+        sys.exit('fatal: test %s is not defined!' % (name,))
+
+    sys.stdout.write('Using test %s; command: %s\n' % (name, command))
+
+
+def cmd_add(parser, options):
+    cmd = ['git', 'config', 'test.%s.command' % (options.test,), options.command]
+    check_call(cmd)
+
+
+def cmd_range(parser, options):
+    setup_test(options.test)
+
+    try:
+        cmd = ['git', 'symbolic-ref', 'HEAD']
+        head = check_output(cmd, stderr=open('/dev/null', 'wb')).rstrip()
+    except CalledProcessError:
+        cmd = ['git', 'rev-parse', 'HEAD']
+        head = check_output(cmd).rstrip()
+
+    if options.force or options.forget:
+        for r in rev_list('--reverse', options.range):
+            forget_note(r)
+
+        if options.forget:
+            sys.exit(0)
+
+    fail_count = 0
+
+    for r in rev_list('--reverse', options.range):
+        cmd = ['git', 'rev-parse', '--short', r]
+        rs = check_output(cmd).rstrip()
+        status = read_status(r, rs)
+        sys.stdout.write('Old status: %s\n' % (status,))
+
+        if status == 'good':
+            sys.stdout.write('Tree %s^{tree} is already known to be good.\n' % (rs,))
+            continue
+
+        if status == 'bad':
+            if options.retest:
+                sys.stdout.write(
+                    'Tree %s^{tree} was previously tested to be bad; retesting...\n'
+                    % (rs,)
+                    )
+                status = 'unknown'
+                # fall through
+            else:
+                sys.stdout.write('Tree %s^{tree} is already known to be bad!\n' % (rs,))
+                status = 'failed'
+                retcode = 1
+
+        if status == 'unknown':
+            try:
+                test_and_record(r)
+            except CalledProcessError as e:
+                # This commit has failed the test.
+                if options.keep_going:
+                    fail_count += 1
+                else:
+                    sys.exit(e.returncode)
+
+    cmd = ['git', 'checkout', '-f', re.sub(r'^refs/heads/', '', head)]
+    check_call(cmd)
+
+    sys.stdout.write('\n')
+    if fail_count == 0:
+        sys.stdout.write('ALL TESTS SUCCESSFUL\n')
+        sys.exit(0)
+    elif fail_count == 1:
+        sys.stdout.write('!!! %s TEST FAILED !!!\n' % (fail_count,))
+        sys.exit(1)
+    else:
+        sys.stdout.write('!!! %s TESTS FAILED !!!\n' % (fail_count,))
+        sys.exit(1)
+
+
+def main(args):
+    require_clean_work_tree('test-range')
+
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        )
+    subparsers = parser.add_subparsers(dest='subcommand', help='sub-command')
+
+    subparser = subparsers.add_parser(
+        'add',
+        help='define a new test',
+        )
+    subparser.add_argument(
+        '--test', '-t', metavar='name',
+        action='store', default='default',
+        help='name of test to add',
+        )
+    subparser.add_argument(
+        'command',
+        help='command to run',
+        )
+
+    subparser = subparsers.add_parser(
+        'range',
+        help='test a range of commits',
+        )
+    subparser.add_argument(
+        '--test', '-t', metavar='name',
+        action='store', default='default',
+        help='name of test',
+        )
+    subparser.add_argument(
+        '--force', '-f', action='store_true',
+        help='forget any existing test results for the range and test it again',
+        )
+    subparser.add_argument(
+        '--forget', action='store_true',
+        help='forget any existing test results for the range',
+        )
+    subparser.add_argument(
+        '--retest', action='store_true',
+        help='if any commit in the range is marked as "bad", try testing it again',
+        )
+    subparser.add_argument(
+        '--keep-going', '-k', action='store_true',
+        help=(
+            'if a commit fails the test, continue testing other commits '
+            'rather than aborting'
+            ),
+        )
+    subparser.add_argument(
+        'range',
+        help='range of commits to test',
+        )
+
+    options = parser.parse_args(args)
+
+    if options.subcommand == 'add':
+        cmd_add(parser, options)
+    elif options.subcommand == 'range':
+        cmd_range(parser, options)
+    else:
+        parser.error('Unrecognized subcommand: "%s"' % (options.subcommand,))
+
+
+if __name__ == '__main__':
+    main(sys.argv[1:])
+
+
