@@ -56,25 +56,6 @@ It will only test commits with trees that it hasn't been seen before.
 
 """
 
-USAGE = r"""\
-git test range [--test=NAME] OPTS RANGE [-- [COMMAND]]...
-"""
-
-LONG_USAGE = r"""\
-Run COMMAND for each commit in the specified RANGE in reverse order,
-stopping if the command fails.  The return code is that of the last
-command executed (i.e., 0 only if the command succeeded for every
-commit in the range).
-
-Options:
-
---forget: forget any existing test results for the range.
---force | -f: forget any existing test results for the range and test it again.
---retest: if any commit in the range is marked as 'bad', try testing it again.
---keep-going | -k: if a commit fails the test, continue testing other commits
-                   rather than aborting.
-"""
-
 import locale
 import sys
 import re
@@ -447,6 +428,19 @@ def cmd_range(parser, options):
         sys.exit(1)
 
 
+def cmd_help(parser, options, subparsers):
+    if options.cmd is not None:
+        try:
+            subparser = subparsers.choices[options.cmd]
+        except KeyError:
+            parser.error('Unknown subcommand: %r (%r)\n' % (options.cmd, type(options.cmd)))
+        subparser.print_help()
+    else:
+        parser.print_help()
+
+    parser.exit()
+
+
 def main(args):
     require_clean_work_tree('test-range')
 
@@ -458,6 +452,9 @@ def main(args):
 
     subparser = subparsers.add_parser(
         'add',
+        description=(
+            'Define a new test by telling what command it should run.'
+            ),
         help='define a new test',
         )
     subparser.add_argument(
@@ -472,7 +469,13 @@ def main(args):
 
     subparser = subparsers.add_parser(
         'range',
-        help='test a range of commits',
+        description=(
+            'Run COMMAND for each commit in the specified RANGE in reverse order, '
+            'stopping if the command fails.  The return code is that of the last '
+            'command executed (i.e., 0 only if the command succeeded for every '
+            'commit in the range).'
+            ),
+        help='run a test against a range of commits',
         )
     subparser.add_argument(
         '--test', '-t', metavar='name',
@@ -503,12 +506,27 @@ def main(args):
         help='range of commits to test',
         )
 
+    subparser = subparsers.add_parser(
+        'help',
+        description=(
+            'Print out help for "git test" in general or for a specific '
+            'subcommand.'
+            ),
+        help='print out help and exit',
+        )
+    subparser.add_argument(
+        'cmd', nargs='?', default=None,
+        help='subcommand that you want help for (optional)',
+        )
+
     options = parser.parse_args(args)
 
     if options.subcommand == 'add':
         cmd_add(parser, options)
     elif options.subcommand == 'range':
         cmd_range(parser, options)
+    elif options.subcommand == 'help':
+        cmd_help(parser, options, subparsers)
     else:
         parser.error('Unrecognized subcommand: "%s"' % (options.subcommand,))
 
