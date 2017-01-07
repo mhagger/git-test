@@ -309,17 +309,17 @@ def forget_note(r):
 
 
 def test_revision(r):
-    cmd = ['git', '--no-pager', 'log', '-1', '--decorate', r]
-    try:
-        check_call(cmd)
-    except CalledProcessError as e:
-        raise Fatal('fatal: error displaying log for commit %s' % (r,))
-
     cmd = ['git', 'checkout', r]
     try:
         check_call(cmd)
     except CalledProcessError as e:
         raise Fatal('fatal: error checking out commit %s' % (r,))
+
+    cmd = ['git', '--no-pager', 'log', '-1', '--decorate', r]
+    try:
+        check_call(cmd)
+    except CalledProcessError as e:
+        raise Fatal('fatal: error displaying log for commit %s' % (r,))
 
     if command is None:
         raise Fatal('fatal: no test command configured')
