@@ -403,7 +403,10 @@ def cmd_range(parser, options):
             else:
                 sys.stdout.write('Tree %s^{tree} is already known to be bad!\n' % (rs,))
                 status = 'failed'
-                retcode = 1
+                if options.keep_going:
+                    fail_count += 1
+                else:
+                    sys.exit(1)
 
         if status == 'unknown':
             try:
