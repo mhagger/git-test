@@ -302,18 +302,17 @@ def forget_note(r):
         raise Fatal('fatal: error removing note from %s^{tree}' % (r,))
 
 
-def test_revision(r, *args):
+def test_revision(r):
     cmd = ['git', '--no-pager', 'log', '-1', '--decorate', r]
     check_call(cmd)
 
     cmd = ['git', 'checkout', r]
     check_call(cmd)
 
-    if command is not None:
-        cmd = ['sh', '-c', command]
-    else:
-        cmd = list(args)
+    if command is None:
+        raise Fatal('fatal: no test command configured')
 
+    cmd = ['sh', '-c', command]
     check_call(cmd)
 
 
@@ -330,9 +329,9 @@ FAIL_TRAILER_TEMPLATE = """\
 FAILURE!
 """
 
-def test_and_record(r, *args):
+def test_and_record(r):
     try:
-        test_revision(r, *args)
+        test_revision(r)
     except CalledProcessError as e:
         cmd = ['git', '--no-pager', 'log', '-1', '--decorate', r]
         sys.stdout.write(FAIL_HEADER_TEMPLATE % dict(r=r))
