@@ -64,7 +64,8 @@ import argparse
 
 
 if not (0x02060000 <= sys.hexversion):
-    sys.exit('Python version 2.6 or later is required')
+    sys.stderr.write('fatal: Python version 2.6 or later is required')
+    sys.exit(125)
 
 
 PREFERRED_ENCODING = locale.getpreferredencoding()
