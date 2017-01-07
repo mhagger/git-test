@@ -123,6 +123,12 @@ class UncleanWorkTreeError(Fatal):
     pass
 
 
+class UserTestError(CalledProcessError):
+    """The user's test failed."""
+
+    pass
+
+
 def communicate(process, input=None):
     """Return decoded output from process."""
     if input is not None:
@@ -304,16 +310,25 @@ def forget_note(r):
 
 def test_revision(r):
     cmd = ['git', '--no-pager', 'log', '-1', '--decorate', r]
-    check_call(cmd)
+    try:
+        check_call(cmd)
+    except CalledProcessError as e:
+        raise Fatal('fatal: error displaying log for commit %s' % (r,))
 
     cmd = ['git', 'checkout', r]
-    check_call(cmd)
+    try:
+        check_call(cmd)
+    except CalledProcessError as e:
+        raise Fatal('fatal: error checking out commit %s' % (r,))
 
     if command is None:
         raise Fatal('fatal: no test command configured')
 
     cmd = ['sh', '-c', command]
-    check_call(cmd)
+    try:
+        check_call(cmd)
+    except CalledProcessError as e:
+        raise UserTestError(e.returncode, e.cmd, e.output)
 
 
 FAIL_HEADER_TEMPLATE = """\
@@ -332,7 +347,7 @@ FAILURE!
 def test_and_record(r):
     try:
         test_revision(r)
-    except CalledProcessError as e:
+    except UserTestError as e:
         cmd = ['git', '--no-pager', 'log', '-1', '--decorate', r]
         sys.stdout.write(FAIL_HEADER_TEMPLATE % dict(r=r))
         check_call(cmd)
@@ -411,7 +426,7 @@ def cmd_range(parser, options):
         if status == 'unknown':
             try:
                 test_and_record(r)
-            except CalledProcessError as e:
+            except UserTestError as e:
                 # This commit has failed the test.
                 if options.keep_going:
                     fail_count += 1
