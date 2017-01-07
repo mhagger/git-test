@@ -108,16 +108,18 @@ except ImportError:
         return output
 
 
-class Failure(Exception):
+class Fatal(Exception):
     """An exception that indicates a normal failure of the script.
 
-    Failures are reported at top level via sys.exit(str(e)) rather
-    than via a Python stack dump."""
+    Fatals are reported at top level by printing str(e) and exiting
+    sys.exit(125) rather than via a Python stack dump.
+
+    """
 
     pass
 
 
-class UncleanWorkTreeError(Failure):
+class UncleanWorkTreeError(Fatal):
     pass
 
 
@@ -163,7 +165,7 @@ def rev_parse(arg, abbrev=None):
     try:
         return check_git_output(cmd).strip()
     except CalledProcessError:
-        raise Failure('%r is not a valid commit!' % (arg,))
+        raise Fatal('%r is not a valid commit!' % (arg,))
 
 
 def rev_list(*args):
@@ -183,7 +185,7 @@ def rev_list(*args):
 
     retcode = process.wait()
     if retcode:
-        raise Failure('git rev-list %s failed' % (' '.join(args),))
+        raise Fatal('git rev-list %s failed' % (' '.join(args),))
 
 
 def refresh_index():
@@ -264,7 +266,7 @@ def read_status(r, rs):
         return 'unknown'
 
     if status not in ['good', 'bad']:
-        sys.exit('fatal: unrecognized status %r for tree %s^{tree}!' % (status, rs))
+        raise Fatal('fatal: unrecognized status %r for tree %s^{tree}!' % (status, rs))
 
     return status
 
@@ -280,7 +282,7 @@ def write_note(r, value):
     try:
         check_call(cmd)
     except CalledProcessError:
-        sys.exit('fatal: error adding note to %s^{tree}' % (r,))
+        raise Fatal('fatal: error adding note to %s^{tree}' % (r,))
     else:
         sys.stderr.write('Marked tree %s^{tree} to be %s\n' % (r, value))
 
@@ -297,7 +299,7 @@ def forget_note(r):
     try:
         check_call(cmd)
     except CalledProcessError:
-        sys.exit('fatal: error removing note from %s^{tree}' % (r,))
+        raise Fatal('fatal: error removing note from %s^{tree}' % (r,))
 
 
 def test_revision(r, *args):
@@ -352,7 +354,7 @@ def setup_test(name):
     try:
         command = check_output(cmd).rstrip()
     except CalledProcessError:
-        sys.exit('fatal: test %s is not defined!' % (name,))
+        raise Fatal('fatal: test %s is not defined!' % (name,))
 
     sys.stdout.write('Using test %s; command: %s\n' % (name, command))
 
@@ -377,7 +379,7 @@ def cmd_range(parser, options):
             forget_note(r)
 
         if options.forget:
-            sys.exit(0)
+            return
 
     fail_count = 0
 
@@ -420,7 +422,7 @@ def cmd_range(parser, options):
     sys.stdout.write('\n')
     if fail_count == 0:
         sys.stdout.write('ALL TESTS SUCCESSFUL\n')
-        sys.exit(0)
+        return
     elif fail_count == 1:
         sys.stdout.write('!!! %s TEST FAILED !!!\n' % (fail_count,))
         sys.exit(1)
@@ -533,6 +535,10 @@ def main(args):
 
 
 if __name__ == '__main__':
-    main(sys.argv[1:])
+    try:
+        main(sys.argv[1:])
+    except Fatal as e:
+        sys.stderr.write('\nERROR!\n%s\n\n' % (e,))
+        sys.exit(125)
 
 
