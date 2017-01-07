@@ -303,7 +303,7 @@ def test_revision(r, *args):
     cmd = ['git', '--no-pager', 'log', '-1', '--decorate', r]
     check_call(cmd)
 
-    cmd = ['git', 'co', r]
+    cmd = ['git', 'checkout', r]
     check_call(cmd)
 
     if command is not None:
