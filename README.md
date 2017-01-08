@@ -119,6 +119,21 @@ Some other features that would be nice:
 
 *   Allow trees to be marked `skip`, if they shouldn't be tested (e.g., due to a known breakage). Perhaps allow the test script to emit a special return code to ask that the commit be marked `skip` (probably following the convention of `git bisect run`).
 
+*   Remember return codes and give them back out if the old result is reused.
+
+*   Add a subcommand to list known results for a commit range in machine-readable format.
+
+*   Handle ranges differently, for example (maybe):
+
+    *   By default, test up to the "upstream" branch (if it is configured)
+    *   `*..*` -- test specified range
+    *   `*..` -- test between specified commit and `HEAD` (though this is fragile if `HEAD` changes often, like now)
+    *   Otherwise -- test single commit
+    *   `--stdin` -- read commits/trees to test from standard input
+    *   `-- [...]` -- pass arbitrary arguments to `git rev-list --reverse`
+
+*   Add a `git test fix <range>`, which starts an interactive rebase, changing the command for the first broken commit from "pick" to "edit".
+
 *   Support tests that depend on the *commit*, not the *tree*, that they are run against.
 
 *   Make the script compatible with Python 3.

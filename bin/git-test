@@ -64,7 +64,8 @@ import argparse
 
 
 if not (0x02060000 <= sys.hexversion):
-    sys.exit('Python version 2.6 or later is required')
+    sys.stderr.write('fatal: Python version 2.6 or later is required')
+    sys.exit(125)
 
 
 PREFERRED_ENCODING = locale.getpreferredencoding()
@@ -107,16 +108,24 @@ except ImportError:
         return output
 
 
-class Failure(Exception):
+class Fatal(Exception):
     """An exception that indicates a normal failure of the script.
 
-    Failures are reported at top level via sys.exit(str(e)) rather
-    than via a Python stack dump."""
+    Fatals are reported at top level by printing str(e) and exiting
+    sys.exit(125) rather than via a Python stack dump.
+
+    """
 
     pass
 
 
-class UncleanWorkTreeError(Failure):
+class UncleanWorkTreeError(Fatal):
+    pass
+
+
+class UserTestError(CalledProcessError):
+    """The user's test failed."""
+
     pass
 
 
@@ -162,7 +171,7 @@ def rev_parse(arg, abbrev=None):
     try:
         return check_git_output(cmd).strip()
     except CalledProcessError:
-        raise Failure('%r is not a valid commit!' % (arg,))
+        raise Fatal('%r is not a valid commit!' % (arg,))
 
 
 def rev_list(*args):
@@ -182,7 +191,7 @@ def rev_list(*args):
 
     retcode = process.wait()
     if retcode:
-        raise Failure('git rev-list %s failed' % (' '.join(args),))
+        raise Fatal('git rev-list %s failed' % (' '.join(args),))
 
 
 def refresh_index():
@@ -263,7 +272,7 @@ def read_status(r, rs):
         return 'unknown'
 
     if status not in ['good', 'bad']:
-        sys.exit('fatal: unrecognized status %r for tree %s^{tree}!' % (status, rs))
+        raise Fatal('fatal: unrecognized status %r for tree %s^{tree}!' % (status, rs))
 
     return status
 
@@ -279,7 +288,7 @@ def write_note(r, value):
     try:
         check_call(cmd)
     except CalledProcessError:
-        sys.exit('fatal: error adding note to %s^{tree}' % (r,))
+        raise Fatal('fatal: error adding note to %s^{tree}' % (r,))
     else:
         sys.stderr.write('Marked tree %s^{tree} to be %s\n' % (r, value))
 
@@ -296,22 +305,30 @@ def forget_note(r):
     try:
         check_call(cmd)
     except CalledProcessError:
-        sys.exit('fatal: error removing note from %s^{tree}' % (r,))
+        raise Fatal('fatal: error removing note from %s^{tree}' % (r,))
 
 
-def test_revision(r, *args):
-    cmd = ['git', '--no-pager', 'log', '-1', '--decorate', r]
-    check_call(cmd)
-
+def test_revision(r):
     cmd = ['git', 'checkout', r]
-    check_call(cmd)
+    try:
+        check_call(cmd)
+    except CalledProcessError as e:
+        raise Fatal('fatal: error checking out commit %s' % (r,))
 
-    if command is not None:
-        cmd = ['sh', '-c', command]
-    else:
-        cmd = list(args)
+    cmd = ['git', '--no-pager', 'log', '-1', '--decorate', r]
+    try:
+        check_call(cmd)
+    except CalledProcessError as e:
+        raise Fatal('fatal: error displaying log for commit %s' % (r,))
 
-    check_call(cmd)
+    if command is None:
+        raise Fatal('fatal: no test command configured')
+
+    cmd = ['sh', '-c', command]
+    try:
+        check_call(cmd)
+    except CalledProcessError as e:
+        raise UserTestError(e.returncode, e.cmd, e.output)
 
 
 FAIL_HEADER_TEMPLATE = """\
@@ -327,10 +344,10 @@ FAIL_TRAILER_TEMPLATE = """\
 FAILURE!
 """
 
-def test_and_record(r, *args):
+def test_and_record(r):
     try:
-        test_revision(r, *args)
-    except CalledProcessError as e:
+        test_revision(r)
+    except UserTestError as e:
         cmd = ['git', '--no-pager', 'log', '-1', '--decorate', r]
         sys.stdout.write(FAIL_HEADER_TEMPLATE % dict(r=r))
         check_call(cmd)
@@ -351,7 +368,7 @@ def setup_test(name):
     try:
         command = check_output(cmd).rstrip()
     except CalledProcessError:
-        sys.exit('fatal: test %s is not defined!' % (name,))
+        raise Fatal('fatal: test %s is not defined!' % (name,))
 
     sys.stdout.write('Using test %s; command: %s\n' % (name, command))
 
@@ -362,6 +379,8 @@ def cmd_add(parser, options):
 
 
 def cmd_range(parser, options):
+    require_clean_work_tree('test-range')
+
     setup_test(options.test)
 
     try:
@@ -376,8 +395,9 @@ def cmd_range(parser, options):
             forget_note(r)
 
         if options.forget:
-            sys.exit(0)
+            return
 
+    last_failure = None
     fail_count = 0
 
     for r in rev_list('--reverse', options.range):
@@ -401,14 +421,18 @@ def cmd_range(parser, options):
             else:
                 sys.stdout.write('Tree %s^{tree} is already known to be bad!\n' % (rs,))
                 status = 'failed'
-                retcode = 1
+                if options.keep_going:
+                    fail_count += 1
+                else:
+                    sys.exit(1)
 
         if status == 'unknown':
             try:
                 test_and_record(r)
-            except CalledProcessError as e:
+            except UserTestError as e:
                 # This commit has failed the test.
                 if options.keep_going:
+                    last_failure = e.returncode
                     fail_count += 1
                 else:
                     sys.exit(e.returncode)
@@ -417,15 +441,19 @@ def cmd_range(parser, options):
     check_call(cmd)
 
     sys.stdout.write('\n')
-    if fail_count == 0:
-        sys.stdout.write('ALL TESTS SUCCESSFUL\n')
-        sys.exit(0)
-    elif fail_count == 1:
-        sys.stdout.write('!!! %s TEST FAILED !!!\n' % (fail_count,))
-        sys.exit(1)
+    if fail_count > 0:
+        if fail_count == 1:
+            sys.stdout.write('!!! %s TEST FAILED !!!\n' % (fail_count,))
+        else:
+            sys.stdout.write('!!! %s TESTS FAILED !!!\n' % (fail_count,))
+
+        if last_failure is not None:
+            sys.exit(last_failure)
+        else:
+            sys.exit(1)
     else:
-        sys.stdout.write('!!! %s TESTS FAILED !!!\n' % (fail_count,))
-        sys.exit(1)
+        sys.stdout.write('ALL TESTS SUCCESSFUL\n')
+        return
 
 
 def cmd_help(parser, options, subparsers):
@@ -442,8 +470,6 @@ def cmd_help(parser, options, subparsers):
 
 
 def main(args):
-    require_clean_work_tree('test-range')
-
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -532,6 +558,10 @@ def main(args):
 
 
 if __name__ == '__main__':
-    main(sys.argv[1:])
+    try:
+        main(sys.argv[1:])
+    except Fatal as e:
+        sys.stderr.write('\nERROR!\n%s\n\n' % (e,))
+        sys.exit(125)
 
 
