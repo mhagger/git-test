@@ -130,4 +130,30 @@ test_expect_success 'default (failing-4-7-8): retest with --force' '
 	test_must_fail git notes --ref=tests/default show $c6^{tree}
 '
 
+test_expect_success 'default (failing-4-7-8): test --keep-going' '
+	git update-ref -d refs/notes/tests/default &&
+	rm -f numbers.log &&
+	test_expect_code 1 git test range --keep-going c2..c9 &&
+	printf "default %s${LF}" 3 4 5 6 7 8 9 >expected &&
+	test_cmp expected numbers.log &&
+	test_must_fail git notes --ref=tests/default show $c2^{tree} &&
+	git notes --ref=tests/default show $c3^{tree} >actual-c3 &&
+	test_cmp good-note actual-c3 &&
+	git notes --ref=tests/default show $c4^{tree} >actual-c4 &&
+	test_cmp bad-note actual-c4 &&
+	git notes --ref=tests/default show $c5^{tree} >actual-c5 &&
+	test_cmp good-note actual-c5 &&
+	git notes --ref=tests/default show $c7^{tree} >actual-c7 &&
+	test_cmp bad-note actual-c7 &&
+	git notes --ref=tests/default show $c9^{tree} >actual-c9 &&
+	test_cmp good-note actual-c9
+'
+
+test_expect_success 'default (failing-4-7-8): retest disjoint commits with --keep-going' '
+	rm -f numbers.log &&
+	test_expect_code 1 git test range --retest --keep-going c2..c9 &&
+	printf "default %s${LF}" 4 7 8 >expected &&
+	test_cmp expected numbers.log
+'
+
 test_done
