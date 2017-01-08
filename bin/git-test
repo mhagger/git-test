@@ -397,6 +397,7 @@ def cmd_range(parser, options):
         if options.forget:
             return
 
+    last_failure = None
     fail_count = 0
 
     for r in rev_list('--reverse', options.range):
@@ -431,6 +432,7 @@ def cmd_range(parser, options):
             except UserTestError as e:
                 # This commit has failed the test.
                 if options.keep_going:
+                    last_failure = e.returncode
                     fail_count += 1
                 else:
                     sys.exit(e.returncode)
@@ -439,15 +441,19 @@ def cmd_range(parser, options):
     check_call(cmd)
 
     sys.stdout.write('\n')
-    if fail_count == 0:
+    if fail_count > 0:
+        if fail_count == 1:
+            sys.stdout.write('!!! %s TEST FAILED !!!\n' % (fail_count,))
+        else:
+            sys.stdout.write('!!! %s TESTS FAILED !!!\n' % (fail_count,))
+
+        if last_failure is not None:
+            sys.exit(last_failure)
+        else:
+            sys.exit(1)
+    else:
         sys.stdout.write('ALL TESTS SUCCESSFUL\n')
         return
-    elif fail_count == 1:
-        sys.stdout.write('!!! %s TEST FAILED !!!\n' % (fail_count,))
-        sys.exit(1)
-    else:
-        sys.stdout.write('!!! %s TESTS FAILED !!!\n' % (fail_count,))
-        sys.exit(1)
 
 
 def cmd_help(parser, options, subparsers):
