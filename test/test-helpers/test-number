@@ -1,0 +1,91 @@
+#! /bin/sh
+
+# Test the contents of file "number" against command-line arguments.
+#
+# Options:
+#
+#   --test=foo : specify the name of the test being run, to be written along
+#                with log entries. This options should appear before --log.
+#                Default value is "default".
+#   --log=FILENAME : append the contents of "number" to the specified file.
+#                    This option should appear before any non-option
+#                    arguments.
+#   --good : subsequent numbers are good.
+#   --bad : subsequent numbers are bad.
+#   --ret=VALUE : subsequent numbers get the specified retcode.
+#
+# Arguments are either numbers, or "*" to match all numbers. The order
+# of arguments and options is significant. If no command line
+# arguments match the contents of "number", print an error and exit
+# with retcode 2.
+
+if ! number=$(cat number)
+then
+	echo >&2 "error: number file doesn't exist!"
+	exit 2
+fi
+
+report() {
+	local retcode=$1
+	case "$retcode" in
+	0)
+		echo >&2 "test-number: test passes"
+		;;
+	1)
+		echo >&2 "test-number: test fails"
+		;;
+	*)
+		echo >&2 "test-number: test fails with exit code $retcode"
+		;;
+	esac
+	exit $retcode
+}
+
+name="default"
+ret=0
+
+for arg
+do
+	case "$arg" in
+	--test=*)
+		name="${arg#--test=}"
+		shift
+		;;
+	--log=*)
+		echo "$name $number" >>"${arg#--log=}"
+		shift
+		;;
+	--good)
+		ret=0
+		shift
+		;;
+	--bad)
+		ret=1
+		shift
+		;;
+	--ret=*)
+		ret="${arg#--ret=}"
+		shift
+		;;
+	-*)
+		echo >&2 "Unrecognized option: $arg"
+		exit 2
+		;;
+	\*)
+		report $ret
+		;;
+	[0-9]*)
+		if test $number = "$arg"
+		then
+			report $ret
+		fi
+		;;
+	*)
+		echo >&2 "Unrecognized argument: $arg"
+		exit 2
+		;;
+	esac
+done
+
+echo >&2 "error: number $number unrecognized!"
+exit 2
