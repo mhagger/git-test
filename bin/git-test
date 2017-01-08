@@ -379,6 +379,8 @@ def cmd_add(parser, options):
 
 
 def cmd_range(parser, options):
+    require_clean_work_tree('test-range')
+
     setup_test(options.test)
 
     try:
@@ -462,8 +464,6 @@ def cmd_help(parser, options, subparsers):
 
 
 def main(args):
-    require_clean_work_tree('test-range')
-
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
