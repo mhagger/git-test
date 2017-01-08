@@ -22,7 +22,8 @@ test_expect_success 'Set up test repository' '
 		git commit -m "Number $i" &&
 		eval "c$i=$(git rev-parse HEAD)" &&
 		git branch "c$i"
-	done
+	done &&
+	echo "good" >good-note
 '
 
 test_expect_success 'default (passing): test range' '
@@ -30,7 +31,13 @@ test_expect_success 'default (passing): test range' '
 	rm -f numbers.log &&
 	git test range c2..c6 &&
 	printf "default %s${LF}" 3 4 5 6 >expected &&
-	test_cmp expected numbers.log
+	test_cmp expected numbers.log &&
+	test_must_fail git notes --ref=tests/default show $c2^{tree} &&
+	git notes --ref=tests/default show $c3^{tree} >actual-c3 &&
+	test_cmp good-note actual-c3 &&
+	git notes --ref=tests/default show $c6^{tree} >actual-c6 &&
+	test_cmp good-note actual-c6 &&
+	test_must_fail git notes --ref=tests/default show $c7^{tree}
 '
 
 test_expect_success 'default (passing): do not re-test known-good commits' '
@@ -63,7 +70,9 @@ test_expect_success 'default (passing): retest with --force' '
 test_expect_success 'default (passing): forget some results' '
 	rm -f numbers.log &&
 	git test range --forget c4..c7 &&
-	test_must_fail test -f numbers.log
+	test_must_fail test -f numbers.log &&
+	test_must_fail git notes --ref=tests/default show $c5^{tree} &&
+	test_must_fail git notes --ref=tests/default show $c7^{tree}
 '
 
 test_expect_success 'default (passing): retest forgotten commits' '
