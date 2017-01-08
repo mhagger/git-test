@@ -156,4 +156,48 @@ test_expect_success 'default (failing-4-7-8): retest disjoint commits with --kee
 	test_cmp expected numbers.log
 '
 
+test_expect_success 'default (retcodes): test range' '
+	git update-ref -d refs/notes/tests/default &&
+	git test add "test-number --log=numbers.log --bad 3 7 --ret=42 5 --good \*" &&
+	rm -f numbers.log &&
+	test_expect_code 42 git test range c3..c6 &&
+	printf "default %s${LF}" 4 5 >expected &&
+	test_cmp expected numbers.log
+'
+
+test_expect_success 'default (retcodes): test range again' '
+	# We do not remember return codes (should we?):
+	rm -f numbers.log &&
+	test_expect_code 1 git test range c3..c6 &&
+	test_must_fail test -f numbers.log
+'
+
+test_expect_success 'default (retcodes): retest range' '
+	rm -f numbers.log &&
+	test_expect_code 42 git test range --retest c3..c6 &&
+	printf "default %s${LF}" 5 >expected &&
+	test_cmp expected numbers.log
+'
+
+test_expect_success 'default (retcodes): force test range' '
+	rm -f numbers.log &&
+	test_expect_code 42 git test range --force c3..c6 &&
+	printf "default %s${LF}" 4 5 >expected &&
+	test_cmp expected numbers.log
+'
+
+test_expect_success 'default (retcodes): keep-going: retcode wins if last' '
+	rm -f numbers.log &&
+	test_expect_code 42 git test range --force --keep-going c1..c6 &&
+	printf "default %s${LF}" 2 3 4 5 6 >expected &&
+	test_cmp expected numbers.log
+'
+
+test_expect_success 'default (retcodes): keep-going: bad wins if last' '
+	rm -f numbers.log &&
+	test_expect_code 1 git test range --force --keep-going c1..c8 &&
+	printf "default %s${LF}" 2 3 4 5 6 7 8 >expected &&
+	test_cmp expected numbers.log
+'
+
 test_done
