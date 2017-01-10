@@ -390,8 +390,10 @@ def cmd_range(parser, options):
         cmd = ['git', 'rev-parse', 'HEAD']
         head = check_output(cmd).rstrip()
 
+    revisions = list(rev_list('--reverse', options.range))
+
     if options.force or options.forget:
-        for r in rev_list('--reverse', options.range):
+        for r in revisions:
             forget_note(r)
 
         if options.forget:
@@ -400,7 +402,7 @@ def cmd_range(parser, options):
     last_failure = None
     fail_count = 0
 
-    for r in rev_list('--reverse', options.range):
+    for r in revisions:
         cmd = ['git', 'rev-parse', '--short', r]
         rs = check_output(cmd).rstrip()
         status = read_status(r, rs)
