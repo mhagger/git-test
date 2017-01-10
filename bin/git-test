@@ -310,6 +310,13 @@ def forget_note(r):
         raise Fatal('fatal: error removing note from %s^{tree}' % (r,))
 
 
+def forget_notes(revisions):
+    """Forget the notes on the specified revisions (if any)."""
+
+    for r in revisions:
+        forget_note(r)
+
+
 def test_revision(r):
     cmd = ['git', 'checkout', r]
     try:
@@ -395,8 +402,7 @@ def cmd_range(parser, options):
     revisions = list(rev_list('--reverse', options.range))
 
     if options.force or options.forget:
-        for r in revisions:
-            forget_note(r)
+        forget_notes(revisions)
 
         if options.forget:
             return
