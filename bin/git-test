@@ -175,10 +175,10 @@ def rev_parse(arg, abbrev=None):
 
 
 def rev_list(*args):
-    """Iterate over (commit, [parent,...]) for the selected commits.
+    """Iterate over the lines of output of rev-list
 
-    args are passed as arguments to "git rev-list" to select which
-    commits should be iterated over.
+    Run `git rev-list` with the specified args, and iterate over the
+    lines of output, one at a time, with whitespace stripped off.
 
     """
 
@@ -293,19 +293,22 @@ def write_note(r, value):
         sys.stderr.write('Marked tree %s^{tree} to be %s\n' % (r, value))
 
 
-def forget_note(r):
-    if notes_ref is None:
-        return
+def forget_notes(revisions):
+    """Forget the notes on the specified revisions (if any)."""
 
     cmd = [
         'git', 'notes', '--ref=%s' % (notes_ref,),
-        'remove', '--ignore-missing', '%s^{tree}' % (r,),
+        'remove', '--ignore-missing', '--stdin',
         ]
 
     try:
-        check_call(cmd)
+        process = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+        process.communicate(''.join('%s^{tree}\n' % (r,) for r in revisions))
+        retcode = process.poll()
+        if retcode:
+            raise Fatal('fatal: error removing one or more existing notes')
     except CalledProcessError:
-        raise Fatal('fatal: error removing note from %s^{tree}' % (r,))
+        raise Fatal('fatal: error removing one or more existing notes')
 
 
 def test_revision(r):
@@ -390,9 +393,10 @@ def cmd_range(parser, options):
         cmd = ['git', 'rev-parse', 'HEAD']
         head = check_output(cmd).rstrip()
 
+    revisions = list(rev_list('--reverse', options.range))
+
     if options.force or options.forget:
-        for r in rev_list('--reverse', options.range):
-            forget_note(r)
+        forget_notes(revisions)
 
         if options.forget:
             return
@@ -400,7 +404,7 @@ def cmd_range(parser, options):
     last_failure = None
     fail_count = 0
 
-    for r in rev_list('--reverse', options.range):
+    for r in revisions:
         cmd = ['git', 'rev-parse', '--short', r]
         rs = check_output(cmd).rstrip()
         status = read_status(r, rs)
