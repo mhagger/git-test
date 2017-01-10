@@ -175,10 +175,10 @@ def rev_parse(arg, abbrev=None):
 
 
 def rev_list(*args):
-    """Iterate over (commit, [parent,...]) for the selected commits.
+    """Iterate over the lines of output of rev-list
 
-    args are passed as arguments to "git rev-list" to select which
-    commits should be iterated over.
+    Run `git rev-list` with the specified args, and iterate over the
+    lines of output, one at a time, with whitespace stripped off.
 
     """
 
