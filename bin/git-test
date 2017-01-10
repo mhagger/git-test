@@ -293,23 +293,6 @@ def write_note(r, value):
         sys.stderr.write('Marked tree %s^{tree} to be %s\n' % (r, value))
 
 
-def forget_note(r):
-    """Forget the note on the tree associated with the specified commit."""
-
-    if notes_ref is None:
-        return
-
-    cmd = [
-        'git', 'notes', '--ref=%s' % (notes_ref,),
-        'remove', '--ignore-missing', '%s^{tree}' % (r,),
-        ]
-
-    try:
-        check_call(cmd)
-    except CalledProcessError:
-        raise Fatal('fatal: error removing note from %s^{tree}' % (r,))
-
-
 def forget_notes(revisions):
     """Forget the notes on the specified revisions (if any)."""
 
