@@ -313,8 +313,19 @@ def forget_note(r):
 def forget_notes(revisions):
     """Forget the notes on the specified revisions (if any)."""
 
-    for r in revisions:
-        forget_note(r)
+    cmd = [
+        'git', 'notes', '--ref=%s' % (notes_ref,),
+        'remove', '--ignore-missing', '--stdin',
+        ]
+
+    try:
+        process = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+        process.communicate(''.join('%s^{tree}\n' % (r,) for r in revisions))
+        retcode = process.poll()
+        if retcode:
+            raise Fatal('fatal: error removing one or more existing notes')
+    except CalledProcessError:
+        raise Fatal('fatal: error removing one or more existing notes')
 
 
 def test_revision(r):
