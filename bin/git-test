@@ -294,6 +294,8 @@ def write_note(r, value):
 
 
 def forget_note(r):
+    """Forget the note on the tree associated with the specified commit."""
+
     if notes_ref is None:
         return
 
