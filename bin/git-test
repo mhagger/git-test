@@ -364,8 +364,6 @@ def test_and_record(r):
 def setup_test(name):
     global notes_ref, command
 
-    sys.stdout.write('setup_test %s\n' % (name,))
-
     notes_ref = 'tests/%s' % (name,)
     cmd = ['git', 'config', '--get', 'test.%s.command' % (name,)]
     try:
