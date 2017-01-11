@@ -324,7 +324,7 @@ def test():
         raise UserTestError(e.returncode, e.cmd, e.output)
 
 
-def test_revision(r):
+def prepare_revision(r):
     cmd = ['git', 'checkout', r]
     try:
         check_call(cmd)
@@ -337,6 +337,9 @@ def test_revision(r):
     except CalledProcessError as e:
         raise Fatal('fatal: error displaying log for commit %s' % (r,))
 
+
+def test_revision(r):
+    prepare_revision(r)
     test()
 
 
