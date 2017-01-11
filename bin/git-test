@@ -48,7 +48,7 @@ tying up your main repository):
     $ git config test.full.command 'make -j16 test'
     $ git worktree add --detach ../tests feature
     $ cd ../tests
-    $ git test range --test=full master..feature
+    $ git test run --test=full master..feature
 
 Any time you make changes to the feature branch in your main
 repository, you can re-run the last command in the `tests` worktree.
@@ -379,8 +379,8 @@ def cmd_add(parser, options):
     check_call(cmd)
 
 
-def cmd_range(parser, options):
-    require_clean_work_tree('test-range')
+def cmd_run(parser, options):
+    require_clean_work_tree('test-run')
 
     setup_test(options.test)
 
@@ -496,7 +496,7 @@ def main(args):
         )
 
     subparser = subparsers.add_parser(
-        'range',
+        'run',
         description=(
             'Run COMMAND for each commit in the specified RANGE in reverse order, '
             'stopping if the command fails.  The return code is that of the last '
@@ -551,8 +551,8 @@ def main(args):
 
     if options.subcommand == 'add':
         cmd_add(parser, options)
-    elif options.subcommand == 'range':
-        cmd_range(parser, options)
+    elif options.subcommand == 'run':
+        cmd_run(parser, options)
     elif options.subcommand == 'help':
         cmd_help(parser, options, subparsers)
     else:
