@@ -129,17 +129,6 @@ test_expect_success 'default (passing): combine args and stdin' '
 	test_cmp expected numbers.log
 '
 
-test_expect_success 'default (passing): test HEAD' '
-	git update-ref -d refs/notes/tests/default &&
-	rm -f numbers.log &&
-	git checkout c5 &&
-	git-test run &&
-	printf "default %s${LF}" 5 >expected &&
-	test_cmp expected numbers.log &&
-	git notes --ref=tests/default show $c5^{tree} >actual-c5 &&
-	test_cmp good-note actual-c5
-'
-
 test_expect_success 'default (failing-4-7-8): test range' '
 	git update-ref -d refs/notes/tests/default &&
 	git-test add "test-number --log=numbers.log --bad 4 7 8 666 --good \*" &&
@@ -213,28 +202,62 @@ test_expect_success 'default (failing-4-7-8): retest disjoint commits with --kee
 	test_cmp expected numbers.log
 '
 
+test_expect_success 'default (failing-4-7-8): test passing HEAD' '
+	git update-ref -d refs/notes/tests/default &&
+	rm -f numbers.log &&
+	git checkout c2 &&
+	git symbolic-ref HEAD >expected-branch &&
+	git-test run &&
+	git symbolic-ref HEAD >actual-branch &&
+	test_cmp expected-branch actual-branch &&
+	printf "default %s${LF}" 2 >expected &&
+	test_cmp expected numbers.log &&
+	git notes --ref=tests/default show $c2^{tree} >actual-c2 &&
+	test_cmp good-note actual-c2
+'
+
+test_expect_success 'default (failing-4-7-8): test failing HEAD' '
+	git update-ref -d refs/notes/tests/default &&
+	rm -f numbers.log &&
+	git checkout c4 &&
+	git symbolic-ref HEAD >expected-branch &&
+	test_expect_code 1 git-test run &&
+	git symbolic-ref HEAD >actual-branch &&
+	test_cmp expected-branch actual-branch &&
+	printf "default %s${LF}" 4 >expected &&
+	test_cmp expected numbers.log &&
+	git notes --ref=tests/default show $c4^{tree} >actual-c4 &&
+	test_cmp bad-note actual-c4
+'
+
 test_expect_success 'default (failing-4-7-8): test passing dirty working copy' '
 	git update-ref -d refs/notes/tests/default &&
 	rm -f numbers.log &&
-	git checkout c5 &&
+	git checkout c4 &&
+	git symbolic-ref HEAD >expected-branch &&
 	echo 42 >number &&
 	test_when_finished "git reset --hard HEAD" &&
 	git-test run &&
+	git symbolic-ref HEAD >actual-branch &&
+	test_cmp expected-branch actual-branch &&
 	printf "default %s${LF}" 42 >expected &&
 	test_cmp expected numbers.log &&
-	test_must_fail git notes --ref=tests/default show $c5^{tree}
+	test_must_fail git notes --ref=tests/default show $c4^{tree}
 '
 
 test_expect_success 'default (failing-4-7-8): test failing dirty working copy' '
 	git update-ref -d refs/notes/tests/default &&
 	rm -f numbers.log &&
-	git checkout c5 &&
+	git checkout c2 &&
+	git symbolic-ref HEAD >expected-branch &&
 	echo 666 >number &&
 	test_when_finished "git reset --hard HEAD" &&
 	test_expect_code 1 git-test run &&
+	git symbolic-ref HEAD >actual-branch &&
+	test_cmp expected-branch actual-branch &&
 	printf "default %s${LF}" 666 >expected &&
 	test_cmp expected numbers.log &&
-	test_must_fail git notes --ref=tests/default show $c5^{tree}
+	test_must_fail git notes --ref=tests/default show $c2^{tree}
 '
 
 test_expect_success 'default (retcodes): test range' '
