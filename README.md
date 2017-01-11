@@ -4,7 +4,7 @@
 
 The best way to use `git test` is to keep a window open in a second linked worktree of your repository, and as often as you like run
 
-    git test range master..mybranch
+    git test run master..mybranch
 
 `git test` will test the commits in that range, reporting any failures. The pass/fail results of running tests are also recorded permanently in your repository as Git "notes" (see `git-notes(1)`).
 
@@ -30,30 +30,42 @@ First define the test that you would like to run; for example,
 
 The string that you specify can be an arbitrary command; it is run with `sh -c`. Its exit code should be 0 if the test passes, or nonzero if it fails. The test definition is stored in your Git config.
 
-### Test a range of commits
+### Test one or more commits
+
+By default, `git test run` tests `HEAD`:
+
+    git test run
+
+(If the working copy is dirty, the test is run anyway but the results are not recorded.)
 
 You can test a range of Git commits with a single command:
 
-    git test range commit1..commit2
+    git test run commit1..commit2
 
-The test is run against each commit in the range, in order from old to new. If a commit fails the test, `git test` reports the error and stops with the broken commit checked out.
+The test is run against each commit in the range, in order from old to new. If a commit fails the test, `git test` reports the error and stops with the broken commit checked out. You can also specify individual commits to test:
+
+    git test run commit1 commit2 commit3
+
+or test an arbitrary set of commits supplied via standard input:
+
+    git rev-list feature1 feature2 ^master | git test run --stdin
 
 ### Define multiple tests
 
 You can define multiple tests in a single repository (e.g., cheap vs. expensive tests). Their results are kept separate. By default, the test called `default` is run, but you can specify a different test to add/run using the `--test=<name>`/`-t <name>` option:
 
     git test add "make test"
-    git test range commit1..commit2
+    git test run commit1..commit2
     git test add --test=build "make"
-    git test range --test=build commit1..commit2
+    git test run --test=build commit1..commit2
 
 ### Retrying tests and/or forgetting old test results
 
-If you have flaky tests that occasionally fail for bogus reasons, you might want to re-run the test against a commit even though `git test` has already recorded a result for that commit. To do so, run `git test range` with the `--force`/`-f` or `--retest` options. If you want to forget old test results without retesting (e.g., if you change the test command), use `--forget`.
+If you have flaky tests that occasionally fail for bogus reasons, you might want to re-run the test against a commit even though `git test` has already recorded a result for that commit. To do so, run `git test run` with the `--force`/`-f` or `--retest` options. If you want to forget old test results without retesting (e.g., if you change the test command), use `--forget`.
 
 ### Continue on test failures
 
-Normally, `git test range` stops at the first broken commit that it finds. If you'd prefer for it to continue, use the `--keep-going`/`-k` option.
+Normally, `git test run` stops at the first broken commit that it finds. If you'd prefer for it to continue, use the `--keep-going`/`-k` option.
 
 ### For help
 
@@ -63,11 +75,11 @@ General help about `git test` can be obtained by running
 
 Help about a particular subcommand can be obtained via either
 
-    git test help range
+    git test help run
 
 or
 
-    git test range --help
+    git test run --help
 
 
 ## Best practice: use `git test` in a linked worktree
@@ -76,7 +88,7 @@ or
 
     git worktree add --detach ../test HEAD
     cd ../test
-    git test range master..mybranch
+    git test run master..mybranch
 
 The last command can be re-run any time; it only does significant work when something changes on your branch. Plus, with this setup you can continue to work in your main working tree while the tests run.
 
@@ -97,11 +109,7 @@ Just put `bin/git-test` somewhere in your `$PATH`, adjusting its first line if n
 
 Some other features that would be nice:
 
-*   Be more consistent about restoring `HEAD`. `git test range` currently checks out the branch that you started on when it is finished, but only if all of the tests passed. We need some kind of `git test reset` command analogous to `git bisect reset`.
-
-*   `git test run`, to run a test on a single commit.
-
-*   Allow tests to be run against a dirty working tree (i.e., against uncommitted changes). Perhaps don't record the test results at all in this case. Perhaps, if all changes in the working tree are staged, record the test results against the tree SHA-1 of the staged changes.
+*   Be more consistent about restoring `HEAD`. `git test run` currently checks out the branch that you started on when it is finished, but only if all of the tests passed. We need some kind of `git test reset` command analogous to `git bisect reset`.
 
 *   `git test bisect`: run `git bisect run` against a range of commits, using a configured test as the command that `bisect` uses to decide whether a commit is good/bad.
 
@@ -122,15 +130,6 @@ Some other features that would be nice:
 *   Remember return codes and give them back out if the old result is reused.
 
 *   Add a subcommand to list known results for a commit range in machine-readable format.
-
-*   Handle ranges differently, for example (maybe):
-
-    *   By default, test up to the "upstream" branch (if it is configured)
-    *   `*..*` -- test specified range
-    *   `*..` -- test between specified commit and `HEAD` (though this is fragile if `HEAD` changes often, like now)
-    *   Otherwise -- test single commit
-    *   `--stdin` -- read commits/trees to test from standard input
-    *   `-- [...]` -- pass arbitrary arguments to `git rev-list --reverse`
 
 *   Add a `git test fix <range>`, which starts an interactive rebase, changing the command for the first broken commit from "pick" to "edit".
 

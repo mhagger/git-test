@@ -4,9 +4,6 @@ test_description="Test the test-number helper script"
 
 . ./sharness.sh
 
-PATH="$(pwd)/../test-helpers:$(pwd)/../bin:$PATH"
-export PATH
-
 test_expect_success 'Test good' '
 	echo "4" >number &&
 	test-number 4 &&

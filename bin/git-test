@@ -30,8 +30,8 @@
   for a particular test are stored in the repository's Git
   configuration.
 
-* Tools for running such tests against single Git commits or against a
-  range of commits.
+* Tools for running such tests against single Git commits or against
+  ranges of commits.
 
 * A scheme for storing the results of such tests as git notes. The
   results are connected to the tree of the commit that was tested, so
@@ -48,7 +48,7 @@ tying up your main repository):
     $ git config test.full.command 'make -j16 test'
     $ git worktree add --detach ../tests feature
     $ cd ../tests
-    $ git test range --test=full master..feature
+    $ git test run --test=full master..feature
 
 Any time you make changes to the feature branch in your main
 repository, you can re-run the last command in the `tests` worktree.
@@ -311,7 +311,20 @@ def forget_notes(revisions):
         raise Fatal('fatal: error removing one or more existing notes')
 
 
-def test_revision(r):
+def test():
+    """Test the current contents of the working tree."""
+
+    if command is None:
+        raise Fatal('fatal: no test command configured')
+
+    cmd = ['sh', '-c', command]
+    try:
+        check_call(cmd)
+    except CalledProcessError as e:
+        raise UserTestError(e.returncode, e.cmd, e.output)
+
+
+def prepare_revision(r):
     cmd = ['git', 'checkout', r]
     try:
         check_call(cmd)
@@ -323,15 +336,6 @@ def test_revision(r):
         check_call(cmd)
     except CalledProcessError as e:
         raise Fatal('fatal: error displaying log for commit %s' % (r,))
-
-    if command is None:
-        raise Fatal('fatal: no test command configured')
-
-    cmd = ['sh', '-c', command]
-    try:
-        check_call(cmd)
-    except CalledProcessError as e:
-        raise UserTestError(e.returncode, e.cmd, e.output)
 
 
 FAIL_HEADER_TEMPLATE = """\
@@ -349,7 +353,7 @@ FAILURE!
 
 def test_and_record(r):
     try:
-        test_revision(r)
+        test()
     except UserTestError as e:
         cmd = ['git', '--no-pager', 'log', '-1', '--decorate', r]
         sys.stdout.write(FAIL_HEADER_TEMPLATE % dict(r=r))
@@ -363,8 +367,6 @@ def test_and_record(r):
 
 def setup_test(name):
     global notes_ref, command
-
-    sys.stdout.write('setup_test %s\n' % (name,))
 
     notes_ref = 'tests/%s' % (name,)
     cmd = ['git', 'config', '--get', 'test.%s.command' % (name,)]
@@ -381,10 +383,77 @@ def cmd_add(parser, options):
     check_call(cmd)
 
 
-def cmd_range(parser, options):
-    require_clean_work_tree('test-range')
+def uniqify(l):
+    """Iterate over the unique items in l, in the original order.
 
+    Yield an item only the first time it is seen."""
+
+    seen = set()
+    for i in l:
+        if i not in seen:
+            yield i
+            seen.add(i)
+
+
+def cmd_run(parser, options):
     setup_test(options.test)
+
+    try:
+        require_clean_work_tree('test-run')
+    except UncleanWorkTreeError:
+        # Unclean work tree; the only action allowed in this state is
+        # testing the working copy:
+        if options.commits or options.stdin or options.forget:
+            raise
+
+        try:
+            test()
+        except UserTestError as e:
+            sys.stdout.write('\n!!! TEST FAILED !!!\n')
+            sys.exit(e.returncode)
+        else:
+            sys.stdout.write('\nTEST SUCCESSFUL\n')
+        finally:
+            sys.stdout.write(
+                'Note: working tree is dirty; results will not be saved.\n'
+                )
+        return
+
+    revisions = []
+
+    if options.stdin:
+        testing_head = False
+    elif not options.commits:
+        revisions.append(rev_parse('HEAD'))
+        testing_head = True
+    elif options.commits == ['HEAD']:
+        testing_head = True
+    else:
+        testing_head = False
+
+    for arg in options.commits:
+        limits = arg.split('..')
+        if len(limits) == 1:
+            revisions.append(rev_parse('%s^{commit}' % (arg,)))
+        elif len(limits) == 2:
+            revisions.extend(rev_list('--reverse', arg))
+        else:
+            parser.error(
+                'commit arguments must be single commits '
+                'or of the form \'A..B\''
+                )
+
+    if options.stdin:
+        revisions.extend(
+            rev_parse('%s^{commit}' % (arg.strip(),))
+            for arg in sys.stdin
+            )
+
+    revisions = list(uniqify(revisions))
+
+    if not revisions:
+        sys.stdout.write('NO COMMITS SPECIFIED! (so none failed)\n')
+        return
 
     try:
         cmd = ['git', 'symbolic-ref', 'HEAD']
@@ -392,8 +461,6 @@ def cmd_range(parser, options):
     except CalledProcessError:
         cmd = ['git', 'rev-parse', 'HEAD']
         head = check_output(cmd).rstrip()
-
-    revisions = list(rev_list('--reverse', options.range))
 
     if options.force or options.forget:
         forget_notes(revisions)
@@ -431,6 +498,9 @@ def cmd_range(parser, options):
                     sys.exit(1)
 
         if status == 'unknown':
+            if not testing_head:
+                prepare_revision(r)
+
             try:
                 test_and_record(r)
             except UserTestError as e:
@@ -441,8 +511,9 @@ def cmd_range(parser, options):
                 else:
                     sys.exit(e.returncode)
 
-    cmd = ['git', 'checkout', '-f', re.sub(r'^refs/heads/', '', head)]
-    check_call(cmd)
+    if not testing_head:
+        cmd = ['git', 'checkout', '-f', re.sub(r'^refs/heads/', '', head)]
+        check_call(cmd)
 
     sys.stdout.write('\n')
     if fail_count > 0:
@@ -478,7 +549,10 @@ def main(args):
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
         )
-    subparsers = parser.add_subparsers(dest='subcommand', help='sub-command')
+    subparsers = parser.add_subparsers(
+        dest='subcommand', help='sub-command',
+        parser_class=argparse.ArgumentParser,
+        )
 
     subparser = subparsers.add_parser(
         'add',
@@ -497,44 +571,68 @@ def main(args):
         help='command to run',
         )
 
+    def add_run_arguments(subparser):
+        subparser.add_argument(
+            '--test', '-t', metavar='name',
+            action='store', default='default',
+            help='name of test',
+            )
+        subparser.add_argument(
+            '--force', '-f', action='store_true',
+            help=(
+                'forget any existing test results for the specified '
+                'commits and test them again'
+                ),
+            )
+        subparser.add_argument(
+            '--forget', action='store_true',
+            help='forget any existing test results for the specified commits',
+            )
+        subparser.add_argument(
+            '--retest', action='store_true',
+            help='if a commit is already marked as "bad", try testing it again',
+            )
+        subparser.add_argument(
+            '--keep-going', '-k', action='store_true',
+            help=(
+                'if a commit fails the test, continue testing other commits '
+                'rather than aborting'
+                ),
+            )
+        subparser.add_argument(
+            '--stdin', action='store_true',
+            help=(
+                'read the list of commits to test from standard input, '
+                'one per line'
+                ),
+            )
+        subparser.add_argument(
+            'commits', nargs='*',
+            help='commits or ranges of commits to test',
+            )
+
     subparser = subparsers.add_parser(
-        'range',
+        'run',
         description=(
             'Run COMMAND for each commit in the specified RANGE in reverse order, '
             'stopping if the command fails.  The return code is that of the last '
             'command executed (i.e., 0 only if the command succeeded for every '
-            'commit in the range).'
+            'specified commit).'
             ),
-        help='run a test against a range of commits',
+        help='run a test against one or more commits',
         )
-    subparser.add_argument(
-        '--test', '-t', metavar='name',
-        action='store', default='default',
-        help='name of test',
-        )
-    subparser.add_argument(
-        '--force', '-f', action='store_true',
-        help='forget any existing test results for the range and test it again',
-        )
-    subparser.add_argument(
-        '--forget', action='store_true',
-        help='forget any existing test results for the range',
-        )
-    subparser.add_argument(
-        '--retest', action='store_true',
-        help='if any commit in the range is marked as "bad", try testing it again',
-        )
-    subparser.add_argument(
-        '--keep-going', '-k', action='store_true',
-        help=(
-            'if a commit fails the test, continue testing other commits '
-            'rather than aborting'
-            ),
-        )
-    subparser.add_argument(
+    add_run_arguments(subparser)
+
+    # This command is no longer supported, but emit a help message if
+    # it is requested:
+    subparser = subparsers.add_parser(
         'range',
-        help='range of commits to test',
+        help='obsolete command; please use "git test run" instead',
         )
+    # We need to accept the 'run' options and arguments, otherwise
+    # argparse will emit an error about unrecognized arguments and
+    # abort before we get a chance to emit our help message:
+    add_run_arguments(subparser)
 
     subparser = subparsers.add_parser(
         'help',
@@ -553,8 +651,10 @@ def main(args):
 
     if options.subcommand == 'add':
         cmd_add(parser, options)
+    elif options.subcommand == 'run':
+        cmd_run(parser, options)
     elif options.subcommand == 'range':
-        cmd_range(parser, options)
+        parser.error('the \'range\' subcommand has been renamed to \'run\'.')
     elif options.subcommand == 'help':
         cmd_help(parser, options, subparsers)
     else:
