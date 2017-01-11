@@ -311,6 +311,19 @@ def forget_notes(revisions):
         raise Fatal('fatal: error removing one or more existing notes')
 
 
+def test():
+    """Test the current contents of the working tree."""
+
+    if command is None:
+        raise Fatal('fatal: no test command configured')
+
+    cmd = ['sh', '-c', command]
+    try:
+        check_call(cmd)
+    except CalledProcessError as e:
+        raise UserTestError(e.returncode, e.cmd, e.output)
+
+
 def test_revision(r):
     cmd = ['git', 'checkout', r]
     try:
@@ -324,14 +337,7 @@ def test_revision(r):
     except CalledProcessError as e:
         raise Fatal('fatal: error displaying log for commit %s' % (r,))
 
-    if command is None:
-        raise Fatal('fatal: no test command configured')
-
-    cmd = ['sh', '-c', command]
-    try:
-        check_call(cmd)
-    except CalledProcessError as e:
-        raise UserTestError(e.returncode, e.cmd, e.output)
+    test()
 
 
 FAIL_HEADER_TEMPLATE = """\
