@@ -416,6 +416,12 @@ def cmd_run(parser, options):
                 'or of the form \'A..B\''
                 )
 
+    if options.stdin:
+        revisions.extend(
+            rev_parse('%s^{commit}' % (arg.strip(),))
+            for arg in sys.stdin
+            )
+
     revisions = list(uniqify(revisions))
 
     if options.force or options.forget:
@@ -552,7 +558,14 @@ def main(args):
                 ),
             )
         subparser.add_argument(
-            'commits', nargs='+',
+            '--stdin', action='store_true',
+            help=(
+                'read the list of commits to test from standard input, '
+                'one per line'
+                ),
+            )
+        subparser.add_argument(
+            'commits', nargs='*',
             help='commits or ranges of commits to test',
             )
 

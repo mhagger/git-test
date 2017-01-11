@@ -40,6 +40,10 @@ The test is run against each commit in the range, in order from old to new. If a
 
     git test run commit1 commit2 commit3
 
+or test an arbitrary set of commits supplied via standard input:
+
+    git rev-list feature1 feature2 ^master | git test run --stdin
+
 ### Define multiple tests
 
 You can define multiple tests in a single repository (e.g., cheap vs. expensive tests). Their results are kept separate. By default, the test called `default` is run, but you can specify a different test to add/run using the `--test=<name>`/`-t <name>` option:
@@ -127,7 +131,6 @@ Some other features that would be nice:
 
     *   By default, test up to the "upstream" branch (if it is configured)
     *   `*..` -- test between specified commit and `HEAD` (though this is fragile if `HEAD` changes often, as is currently the case)
-    *   `--stdin` -- read commits/trees to test from standard input
     *   `-- [...]` -- pass arbitrary arguments to `git rev-list --reverse`
 
 *   Add a `git test fix <range>`, which starts an interactive rebase, changing the command for the first broken commit from "pick" to "edit".

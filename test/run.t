@@ -112,6 +112,23 @@ test_expect_success 'default (passing): commits uniqified' '
 	test_cmp expected numbers.log
 '
 
+test_expect_success 'default (passing): read commits from stdin' '
+	git update-ref -d refs/notes/tests/default &&
+	rm -f numbers.log &&
+	git rev-list c2..c6 | git-test run --stdin &&
+	printf "default %s${LF}" 6 5 4 3 >expected &&
+	test_cmp expected numbers.log
+'
+
+test_expect_success 'default (passing): combine args and stdin' '
+	git update-ref -d refs/notes/tests/default &&
+	rm -f numbers.log &&
+	git rev-list c2..c6 | git-test run --stdin c5 c8 &&
+	# Note that rev-list was called without --reverse:
+	printf "default %s${LF}" 5 8 6 4 3 >expected &&
+	test_cmp expected numbers.log
+'
+
 test_expect_success 'default (failing-4-7-8): test range' '
 	git update-ref -d refs/notes/tests/default &&
 	git-test add "test-number --log=numbers.log --bad 4 7 8 --good \*" &&
