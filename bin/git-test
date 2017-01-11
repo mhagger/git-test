@@ -476,7 +476,10 @@ def main(args):
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
         )
-    subparsers = parser.add_subparsers(dest='subcommand', help='sub-command')
+    subparsers = parser.add_subparsers(
+        dest='subcommand', help='sub-command',
+        parser_class=argparse.ArgumentParser,
+        )
 
     subparser = subparsers.add_parser(
         'add',
@@ -495,6 +498,36 @@ def main(args):
         help='command to run',
         )
 
+    def add_run_arguments(subparser):
+        subparser.add_argument(
+            '--test', '-t', metavar='name',
+            action='store', default='default',
+            help='name of test',
+            )
+        subparser.add_argument(
+            '--force', '-f', action='store_true',
+            help='forget any existing test results for the range and test it again',
+            )
+        subparser.add_argument(
+            '--forget', action='store_true',
+            help='forget any existing test results for the range',
+            )
+        subparser.add_argument(
+            '--retest', action='store_true',
+            help='if any commit in the range is marked as "bad", try testing it again',
+            )
+        subparser.add_argument(
+            '--keep-going', '-k', action='store_true',
+            help=(
+                'if a commit fails the test, continue testing other commits '
+                'rather than aborting'
+                ),
+            )
+        subparser.add_argument(
+            'range',
+            help='range of commits to test',
+            )
+
     subparser = subparsers.add_parser(
         'run',
         description=(
@@ -505,34 +538,18 @@ def main(args):
             ),
         help='run a test against a range of commits',
         )
-    subparser.add_argument(
-        '--test', '-t', metavar='name',
-        action='store', default='default',
-        help='name of test',
-        )
-    subparser.add_argument(
-        '--force', '-f', action='store_true',
-        help='forget any existing test results for the range and test it again',
-        )
-    subparser.add_argument(
-        '--forget', action='store_true',
-        help='forget any existing test results for the range',
-        )
-    subparser.add_argument(
-        '--retest', action='store_true',
-        help='if any commit in the range is marked as "bad", try testing it again',
-        )
-    subparser.add_argument(
-        '--keep-going', '-k', action='store_true',
-        help=(
-            'if a commit fails the test, continue testing other commits '
-            'rather than aborting'
-            ),
-        )
-    subparser.add_argument(
+    add_run_arguments(subparser)
+
+    # This command is no longer supported, but emit a help message if
+    # it is requested:
+    subparser = subparsers.add_parser(
         'range',
-        help='range of commits to test',
+        help='obsolete command; please use "git test run" instead',
         )
+    # We need to accept the 'run' options and arguments, otherwise
+    # argparse will emit an error about unrecognized arguments and
+    # abort before we get a chance to emit our help message:
+    add_run_arguments(subparser)
 
     subparser = subparsers.add_parser(
         'help',
@@ -553,6 +570,8 @@ def main(args):
         cmd_add(parser, options)
     elif options.subcommand == 'run':
         cmd_run(parser, options)
+    elif options.subcommand == 'range':
+        parser.error('the \'range\' subcommand has been renamed to \'run\'.')
     elif options.subcommand == 'help':
         cmd_help(parser, options, subparsers)
     else:
