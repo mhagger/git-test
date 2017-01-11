@@ -230,6 +230,20 @@ test_expect_success 'default (failing-4-7-8): test failing HEAD' '
 	test_cmp bad-note actual-c4
 '
 
+test_expect_success 'default (failing-4-7-8): test failing explicit HEAD' '
+	git update-ref -d refs/notes/tests/default &&
+	rm -f numbers.log &&
+	git checkout c4 &&
+	git symbolic-ref HEAD >expected-branch &&
+	test_expect_code 1 git-test run HEAD &&
+	git symbolic-ref HEAD >actual-branch &&
+	test_cmp expected-branch actual-branch &&
+	printf "default %s${LF}" 4 >expected &&
+	test_cmp expected numbers.log &&
+	git notes --ref=tests/default show $c4^{tree} >actual-c4 &&
+	test_cmp bad-note actual-c4
+'
+
 test_expect_success 'default (failing-4-7-8): test passing dirty working copy' '
 	git update-ref -d refs/notes/tests/default &&
 	rm -f numbers.log &&

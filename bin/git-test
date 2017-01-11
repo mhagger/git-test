@@ -421,11 +421,15 @@ def cmd_run(parser, options):
 
     revisions = []
 
-    if options.commits or options.stdin:
+    if options.stdin:
         testing_head = False
-    else:
-        testing_head = True
+    elif not options.commits:
         revisions.append(rev_parse('HEAD'))
+        testing_head = True
+    elif options.commits == ['HEAD']:
+        testing_head = True
+    else:
+        testing_head = False
 
     for arg in options.commits:
         limits = arg.split('..')
