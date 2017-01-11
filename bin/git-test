@@ -338,11 +338,6 @@ def prepare_revision(r):
         raise Fatal('fatal: error displaying log for commit %s' % (r,))
 
 
-def test_revision(r):
-    prepare_revision(r)
-    test()
-
-
 FAIL_HEADER_TEMPLATE = """\
 
 *******************************************************************************
@@ -357,8 +352,9 @@ FAILURE!
 """
 
 def test_and_record(r):
+    prepare_revision(r)
     try:
-        test_revision(r)
+        test()
     except UserTestError as e:
         cmd = ['git', '--no-pager', 'log', '-1', '--decorate', r]
         sys.stdout.write(FAIL_HEADER_TEMPLATE % dict(r=r))
