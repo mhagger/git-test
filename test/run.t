@@ -80,6 +80,30 @@ test_expect_success 'default (passing): retest forgotten commits' '
 	test_cmp expected numbers.log
 '
 
+test_expect_success 'default (passing): test a single commit' '
+	git update-ref -d refs/notes/tests/default &&
+	rm -f numbers.log &&
+	git-test run c5 &&
+	printf "default %s${LF}" 5 >expected &&
+	test_cmp expected numbers.log
+'
+
+test_expect_success 'default (passing): test a few single commits' '
+	git update-ref -d refs/notes/tests/default &&
+	rm -f numbers.log &&
+	git-test run c2 c6 c4 &&
+	printf "default %s${LF}" 2 6 4 >expected &&
+	test_cmp expected numbers.log
+'
+
+test_expect_success 'default (passing): test a single commit and a range' '
+	git update-ref -d refs/notes/tests/default &&
+	rm -f numbers.log &&
+	git-test run c9 c4..c6 &&
+	printf "default %s${LF}" 9 5 6 >expected &&
+	test_cmp expected numbers.log
+'
+
 test_expect_success 'default (failing-4-7-8): test range' '
 	git update-ref -d refs/notes/tests/default &&
 	git-test add "test-number --log=numbers.log --bad 4 7 8 --good \*" &&

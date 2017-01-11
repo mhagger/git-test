@@ -30,8 +30,8 @@
   for a particular test are stored in the repository's Git
   configuration.
 
-* Tools for running such tests against single Git commits or against a
-  range of commits.
+* Tools for running such tests against single Git commits or against
+  ranges of commits.
 
 * A scheme for storing the results of such tests as git notes. The
   results are connected to the tree of the commit that was tested, so
@@ -391,7 +391,18 @@ def cmd_run(parser, options):
         cmd = ['git', 'rev-parse', 'HEAD']
         head = check_output(cmd).rstrip()
 
-    revisions = list(rev_list('--reverse', options.range))
+    revisions = []
+    for arg in options.commits:
+        limits = arg.split('..')
+        if len(limits) == 1:
+            revisions.append(rev_parse('%s^{commit}' % (arg,)))
+        elif len(limits) == 2:
+            revisions.extend(rev_list('--reverse', arg))
+        else:
+            parser.error(
+                'commit arguments must be single commits '
+                'or of the form \'A..B\''
+                )
 
     if options.force or options.forget:
         forget_notes(revisions)
@@ -506,15 +517,18 @@ def main(args):
             )
         subparser.add_argument(
             '--force', '-f', action='store_true',
-            help='forget any existing test results for the range and test it again',
+            help=(
+                'forget any existing test results for the specified '
+                'commits and test them again'
+                ),
             )
         subparser.add_argument(
             '--forget', action='store_true',
-            help='forget any existing test results for the range',
+            help='forget any existing test results for the specified commits',
             )
         subparser.add_argument(
             '--retest', action='store_true',
-            help='if any commit in the range is marked as "bad", try testing it again',
+            help='if a commit is already marked as "bad", try testing it again',
             )
         subparser.add_argument(
             '--keep-going', '-k', action='store_true',
@@ -524,8 +538,8 @@ def main(args):
                 ),
             )
         subparser.add_argument(
-            'range',
-            help='range of commits to test',
+            'commits', nargs='+',
+            help='commits or ranges of commits to test',
             )
 
     subparser = subparsers.add_parser(
@@ -534,9 +548,9 @@ def main(args):
             'Run COMMAND for each commit in the specified RANGE in reverse order, '
             'stopping if the command fails.  The return code is that of the last '
             'command executed (i.e., 0 only if the command succeeded for every '
-            'commit in the range).'
+            'specified commit).'
             ),
-        help='run a test against a range of commits',
+        help='run a test against one or more commits',
         )
     add_run_arguments(subparser)
 
