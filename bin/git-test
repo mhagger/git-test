@@ -352,7 +352,6 @@ FAILURE!
 """
 
 def test_and_record(r):
-    prepare_revision(r)
     try:
         test()
     except UserTestError as e:
@@ -465,6 +464,7 @@ def cmd_run(parser, options):
                     sys.exit(1)
 
         if status == 'unknown':
+            prepare_revision(r)
             try:
                 test_and_record(r)
             except UserTestError as e:
