@@ -379,6 +379,18 @@ def cmd_add(parser, options):
     check_call(cmd)
 
 
+def uniqify(l):
+    """Iterate over the unique items in l, in the original order.
+
+    Yield an item only the first time it is seen."""
+
+    seen = set()
+    for i in l:
+        if i not in seen:
+            yield i
+            seen.add(i)
+
+
 def cmd_run(parser, options):
     require_clean_work_tree('test-run')
 
@@ -403,6 +415,8 @@ def cmd_run(parser, options):
                 'commit arguments must be single commits '
                 'or of the form \'A..B\''
                 )
+
+    revisions = list(uniqify(revisions))
 
     if options.force or options.forget:
         forget_notes(revisions)

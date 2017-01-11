@@ -104,6 +104,14 @@ test_expect_success 'default (passing): test a single commit and a range' '
 	test_cmp expected numbers.log
 '
 
+test_expect_success 'default (passing): commits uniqified' '
+	git update-ref -d refs/notes/tests/default &&
+	rm -f numbers.log &&
+	git-test run c4..c6 c8 c5 c3..c9 &&
+	printf "default %s${LF}" 5 6 8 4 7 9 >expected &&
+	test_cmp expected numbers.log
+'
+
 test_expect_success 'default (failing-4-7-8): test range' '
 	git update-ref -d refs/notes/tests/default &&
 	git-test add "test-number --log=numbers.log --bad 4 7 8 --good \*" &&
