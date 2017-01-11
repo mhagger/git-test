@@ -32,7 +32,13 @@ The string that you specify can be an arbitrary command; it is run with `sh -c`.
 
 ### Test one or more commits
 
-You can test multiple Git commits with a single command:
+By default, `git test run` tests `HEAD`:
+
+    git test run
+
+(If the working copy is dirty, the test is run anyway but the results are not recorded.)
+
+You can test a range of Git commits with a single command:
 
     git test run commit1..commit2
 
@@ -105,8 +111,6 @@ Some other features that would be nice:
 
 *   Be more consistent about restoring `HEAD`. `git test run` currently checks out the branch that you started on when it is finished, but only if all of the tests passed. We need some kind of `git test reset` command analogous to `git bisect reset`.
 
-*   Allow tests to be run against a dirty working tree (i.e., against uncommitted changes). Perhaps don't record the test results at all in this case. Perhaps, if all changes in the working tree are staged, record the test results against the tree SHA-1 of the staged changes.
-
 *   `git test bisect`: run `git bisect run` against a range of commits, using a configured test as the command that `bisect` uses to decide whether a commit is good/bad.
 
 *   `git test remove`: remove a test definition and its associated notes.
@@ -126,12 +130,6 @@ Some other features that would be nice:
 *   Remember return codes and give them back out if the old result is reused.
 
 *   Add a subcommand to list known results for a commit range in machine-readable format.
-
-*   Add some more options for specifying commits, for example (maybe):
-
-    *   By default, test up to the "upstream" branch (if it is configured)
-    *   `*..` -- test between specified commit and `HEAD` (though this is fragile if `HEAD` changes often, as is currently the case)
-    *   `-- [...]` -- pass arbitrary arguments to `git rev-list --reverse`
 
 *   Add a `git test fix <range>`, which starts an interactive rebase, changing the command for the first broken commit from "pick" to "edit".
 

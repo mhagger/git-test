@@ -129,9 +129,20 @@ test_expect_success 'default (passing): combine args and stdin' '
 	test_cmp expected numbers.log
 '
 
+test_expect_success 'default (passing): test HEAD' '
+	git update-ref -d refs/notes/tests/default &&
+	rm -f numbers.log &&
+	git checkout c5 &&
+	git-test run &&
+	printf "default %s${LF}" 5 >expected &&
+	test_cmp expected numbers.log &&
+	git notes --ref=tests/default show $c5^{tree} >actual-c5 &&
+	test_cmp good-note actual-c5
+'
+
 test_expect_success 'default (failing-4-7-8): test range' '
 	git update-ref -d refs/notes/tests/default &&
-	git-test add "test-number --log=numbers.log --bad 4 7 8 --good \*" &&
+	git-test add "test-number --log=numbers.log --bad 4 7 8 666 --good \*" &&
 	rm -f numbers.log &&
 	test_expect_code 1 git-test run c2..c5 &&
 	printf "default %s${LF}" 3 4 >expected &&
@@ -200,6 +211,30 @@ test_expect_success 'default (failing-4-7-8): retest disjoint commits with --kee
 	test_expect_code 1 git-test run --retest --keep-going c2..c9 &&
 	printf "default %s${LF}" 4 7 8 >expected &&
 	test_cmp expected numbers.log
+'
+
+test_expect_success 'default (failing-4-7-8): test passing dirty working copy' '
+	git update-ref -d refs/notes/tests/default &&
+	rm -f numbers.log &&
+	git checkout c5 &&
+	echo 42 >number &&
+	test_when_finished "git reset --hard HEAD" &&
+	git-test run &&
+	printf "default %s${LF}" 42 >expected &&
+	test_cmp expected numbers.log &&
+	test_must_fail git notes --ref=tests/default show $c5^{tree}
+'
+
+test_expect_success 'default (failing-4-7-8): test failing dirty working copy' '
+	git update-ref -d refs/notes/tests/default &&
+	rm -f numbers.log &&
+	git checkout c5 &&
+	echo 666 >number &&
+	test_when_finished "git reset --hard HEAD" &&
+	test_expect_code 1 git-test run &&
+	printf "default %s${LF}" 666 >expected &&
+	test_cmp expected numbers.log &&
+	test_must_fail git notes --ref=tests/default show $c5^{tree}
 '
 
 test_expect_success 'default (retcodes): test range' '

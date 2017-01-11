@@ -396,18 +396,37 @@ def uniqify(l):
 
 
 def cmd_run(parser, options):
-    require_clean_work_tree('test-run')
-
     setup_test(options.test)
 
     try:
-        cmd = ['git', 'symbolic-ref', 'HEAD']
-        head = check_output(cmd, stderr=open('/dev/null', 'wb')).rstrip()
-    except CalledProcessError:
-        cmd = ['git', 'rev-parse', 'HEAD']
-        head = check_output(cmd).rstrip()
+        require_clean_work_tree('test-run')
+    except UncleanWorkTreeError:
+        # Unclean work tree; the only action allowed in this state is
+        # testing the working copy:
+        if options.commits or options.stdin or options.forget:
+            raise
+
+        try:
+            test()
+        except UserTestError as e:
+            sys.stdout.write('\n!!! TEST FAILED !!!\n')
+            sys.exit(e.returncode)
+        else:
+            sys.stdout.write('\nTEST SUCCESSFUL\n')
+        finally:
+            sys.stdout.write(
+                'Note: working tree is dirty; results will not be saved.\n'
+                )
+        return
 
     revisions = []
+
+    if options.commits or options.stdin:
+        testing_head = False
+    else:
+        testing_head = True
+        revisions.append(rev_parse('HEAD'))
+
     for arg in options.commits:
         limits = arg.split('..')
         if len(limits) == 1:
@@ -427,6 +446,17 @@ def cmd_run(parser, options):
             )
 
     revisions = list(uniqify(revisions))
+
+    if not revisions:
+        sys.stdout.write('NO COMMITS SPECIFIED! (so none failed)\n')
+        return
+
+    try:
+        cmd = ['git', 'symbolic-ref', 'HEAD']
+        head = check_output(cmd, stderr=open('/dev/null', 'wb')).rstrip()
+    except CalledProcessError:
+        cmd = ['git', 'rev-parse', 'HEAD']
+        head = check_output(cmd).rstrip()
 
     if options.force or options.forget:
         forget_notes(revisions)
@@ -464,7 +494,9 @@ def cmd_run(parser, options):
                     sys.exit(1)
 
         if status == 'unknown':
-            prepare_revision(r)
+            if not testing_head:
+                prepare_revision(r)
+
             try:
                 test_and_record(r)
             except UserTestError as e:
@@ -475,8 +507,9 @@ def cmd_run(parser, options):
                 else:
                     sys.exit(e.returncode)
 
-    cmd = ['git', 'checkout', '-f', re.sub(r'^refs/heads/', '', head)]
-    check_call(cmd)
+    if not testing_head:
+        cmd = ['git', 'checkout', '-f', re.sub(r'^refs/heads/', '', head)]
+        check_call(cmd)
 
     sys.stdout.write('\n')
     if fail_count > 0:
