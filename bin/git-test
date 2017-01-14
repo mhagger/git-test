@@ -617,10 +617,12 @@ def cmd_forget_results(parser, options):
 
 
 def cmd_remove(parser, options):
-    cmd = ['git', 'config', '--remove-section', 'test.%s' % (options.test,)]
+    test = Test(options.test)
+
+    cmd = ['git', 'config', '--remove-section', 'test.%s' % (test.name,)]
     check_call(cmd)
     remove_notes(
-        options.test, 'Test results deleted by \'git test remove\''
+        test.name, 'Test results deleted by \'git test remove\''
         )
 
 
