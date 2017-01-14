@@ -354,9 +354,6 @@ class Test(object):
             raise UserTestError(e.returncode, e.cmd, e.output)
 
 
-notes_ref = None
-
-
 def prepare_revision(r):
     cmd = ['git', 'checkout', r]
     try:
@@ -399,10 +396,9 @@ def test_and_record(r):
 
 
 def setup_test(name):
-    global test, notes_ref
+    global test
 
     test = Test(name)
-    notes_ref = test.notes_ref
 
     sys.stdout.write('Using test %s; command: %s\n' % (name, test.command))
 
