@@ -287,6 +287,24 @@ class Test(object):
         self.full_ref = 'refs/notes/tests/%s' % (self.name,)
         self._command = None
 
+    def read_status(self, revision, revision_short):
+        cmd = [
+            'git', 'notes', '--ref=%s' % (self.notes_ref,),
+            'show', '%s^{tree}' % (revision,),
+            ]
+        try:
+            status = check_output(cmd, stderr=open(os.devnull, 'wb')).rstrip()
+        except CalledProcessError:
+            return 'unknown'
+
+        if status not in ['good', 'bad']:
+            raise Fatal(
+                'fatal: unrecognized status %r for tree %s^{tree}!'
+                % (status, revision_short),
+                )
+
+        return status
+
     @property
     def command(self):
         if self._command is None:
@@ -308,22 +326,6 @@ class Test(object):
 
 
 notes_ref = None
-
-def read_status(r, rs):
-    if notes_ref is None:
-        return 'unknown'
-
-    cmd = ['git', 'notes', '--ref=%s' % (notes_ref,), 'show', '%s^{tree}' % (r,)]
-    try:
-        status = check_output(cmd, stderr=open(os.devnull, 'wb')).rstrip()
-    except CalledProcessError:
-        return 'unknown'
-
-    if status not in ['good', 'bad']:
-        raise Fatal('fatal: unrecognized status %r for tree %s^{tree}!' % (status, rs))
-
-    return status
-
 
 def write_note(r, value):
     if notes_ref is None:
@@ -552,7 +554,7 @@ def cmd_run(parser, options):
     for r in revisions:
         cmd = ['git', 'rev-parse', '--short', r]
         rs = check_output(cmd).rstrip()
-        status = read_status(r, rs)
+        status = test.read_status(r, rs)
         sys.stdout.write('Old status: %s\n' % (status,))
 
         if status == 'good':
