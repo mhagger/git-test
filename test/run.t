@@ -177,6 +177,20 @@ test_expect_success 'default (failing-4-7-8): do not re-test known commits' '
 	test_must_fail test -f numbers.log
 '
 
+test_expect_success 'default (failing-4-7-8): --dry-run' '
+	rm -f numbers.log &&
+	test_expect_code 1 git-test run --dry-run c1..c6 >actual-stdout &&
+	cmp_stdout actual-stdout c2 unknown c3 known-good c4 known-bad &&
+	test_must_fail test -f numbers.log
+'
+
+test_expect_success 'default (failing-4-7-8): --dry-run --keep-going' '
+	rm -f numbers.log &&
+	test_expect_code 1 git-test run --dry-run --keep-going c1..c6 >actual-stdout &&
+	cmp_stdout actual-stdout c2 unknown c3 known-good c4 known-bad c5 unknown c6 unknown &&
+	test_must_fail test -f numbers.log
+'
+
 test_expect_success 'default (failing-4-7-8): do not re-test known subrange' '
 	rm -f numbers.log &&
 	test_expect_code 1 git-test run c1..c6 >actual-stdout &&
@@ -294,6 +308,18 @@ test_expect_success 'default (failing-4-7-8): test passing dirty working copy' '
 	printf "default %s${LF}" 42 >expected &&
 	test_cmp expected numbers.log &&
 	test_must_fail git notes --ref=tests/default show $c4^{tree}
+'
+
+test_expect_success 'default (failing-4-7-8): cannot test dirty working copy woth --dry-run' '
+	echo 111 >number &&
+	test_when_finished "git reset --hard HEAD" &&
+	test_expect_code 125 git-test run --dry-run
+'
+
+test_expect_success 'default (failing-4-7-8): cannot test dirty working copy woth --forget' '
+	echo 111 >number &&
+	test_when_finished "git reset --hard HEAD" &&
+	test_expect_code 125 git-test run --forget
 '
 
 test_expect_success 'default (failing-4-7-8): test failing dirty working copy' '

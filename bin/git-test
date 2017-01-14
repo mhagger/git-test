@@ -483,7 +483,7 @@ def cmd_run(parser, options):
     except UncleanWorkTreeError:
         # Unclean work tree; the only action allowed in this state is
         # testing the working copy:
-        if options.commits or options.stdin or options.forget:
+        if options.commits or options.stdin or options.forget or options.dry_run:
             raise
 
         try:
@@ -552,6 +552,7 @@ def cmd_run(parser, options):
 
     last_failure = None
     fail_count = 0
+    unknown_count = 0
 
     for r in revisions:
         cmd = ['git', 'rev-parse', '--short', r]
@@ -563,7 +564,7 @@ def cmd_run(parser, options):
             sys.stderr.write('Tree %s^{tree} is already known to be good.\n' % (rs,))
 
         elif status == 'bad':
-            if options.retest:
+            if options.retest and not options.dry_run:
                 sys.stderr.write(
                     'Tree %s^{tree} was previously tested to be bad; retesting...\n'
                     % (rs,)
@@ -580,7 +581,11 @@ def cmd_run(parser, options):
                     sys.exit(1)
 
         elif status == 'unknown':
-            status = None
+            if options.dry_run:
+                sys.stdout.write('%s^{tree} unknown\n' % (r,))
+                unknown_count += 1
+            else:
+                status = None
 
         if status is None:
             if not testing_head:
@@ -611,6 +616,13 @@ def cmd_run(parser, options):
             sys.exit(last_failure)
         else:
             sys.exit(1)
+    elif unknown_count > 0:
+        if unknown_count == 1:
+            sys.stderr.write('%s TEST UNKNOWN\n' % (unknown_count,))
+        else:
+            sys.stderr.write('%s TESTS UNKNOWN\n' % (unknown_count,))
+
+        sys.exit(2)
     else:
         sys.stderr.write('ALL TESTS SUCCESSFUL\n')
         return
@@ -714,6 +726,12 @@ def main(args):
             help=(
                 'if a commit fails the test, continue testing other commits '
                 'rather than aborting'
+                ),
+            )
+        subparser.add_argument(
+            '--dry-run', '-n', action='store_true',
+            help=(
+                'show known results, without running any new tests'
                 ),
             )
         subparser.add_argument(
