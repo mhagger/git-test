@@ -379,7 +379,7 @@ class Test(object):
 
         cmd = ['sh', '-c', self.command]
         try:
-            check_call(cmd)
+            check_call(cmd, stdout=sys.stderr)
         except CalledProcessError as e:
             raise UserTestError(e.returncode, e.cmd, e.output)
 
@@ -388,9 +388,9 @@ class Test(object):
             self.run()
         except UserTestError as e:
             cmd = ['git', '--no-pager', 'log', '-1', '--decorate', revision]
-            sys.stdout.write(FAIL_HEADER_TEMPLATE % dict(revision=revision))
-            check_call(cmd)
-            sys.stdout.write(FAIL_TRAILER_TEMPLATE % dict())
+            sys.stderr.write(FAIL_HEADER_TEMPLATE % dict(revision=revision))
+            check_call(cmd, stdout=sys.stderr)
+            sys.stderr.write(FAIL_TRAILER_TEMPLATE % dict())
             self.write_status(revision, 'bad')
             raise
         else:
@@ -414,13 +414,13 @@ class Test(object):
 def prepare_revision(r):
     cmd = ['git', 'checkout', r]
     try:
-        check_call(cmd)
+        check_output(cmd, stderr=subprocess.STDOUT)
     except CalledProcessError as e:
-        raise Fatal('fatal: error checking out commit %s' % (r,))
+        raise Fatal('fatal: error checking out commit %s:\n%s' % (r, e.output,))
 
     cmd = ['git', '--no-pager', 'log', '-1', '--decorate', r]
     try:
-        check_call(cmd)
+        check_call(cmd, stdout=sys.stderr)
     except CalledProcessError as e:
         raise Fatal('fatal: error displaying log for commit %s' % (r,))
 
@@ -487,12 +487,12 @@ def cmd_run(parser, options):
         try:
             test.run()
         except UserTestError as e:
-            sys.stdout.write('\n!!! TEST FAILED !!!\n')
+            sys.stderr.write('\n!!! TEST FAILED !!!\n')
             sys.exit(e.returncode)
         else:
-            sys.stdout.write('\nTEST SUCCESSFUL\n')
+            sys.stderr.write('\nTEST SUCCESSFUL\n')
         finally:
-            sys.stdout.write(
+            sys.stderr.write(
                 'Note: working tree is dirty; results will not be saved.\n'
                 )
         return
@@ -530,7 +530,7 @@ def cmd_run(parser, options):
     revisions = list(uniqify(revisions))
 
     if not revisions:
-        sys.stdout.write('NO COMMITS SPECIFIED! (so none failed)\n')
+        sys.stderr.write('NO COMMITS SPECIFIED! (so none failed)\n')
         return
 
     try:
@@ -553,22 +553,21 @@ def cmd_run(parser, options):
         cmd = ['git', 'rev-parse', '--short', r]
         rs = check_output(cmd).rstrip()
         status = test.read_status(r, rs)
-        sys.stdout.write('Old status: %s\n' % (status,))
 
         if status == 'good':
-            sys.stdout.write('Tree %s^{tree} is already known to be good.\n' % (rs,))
+            sys.stderr.write('Tree %s^{tree} is already known to be good.\n' % (rs,))
             continue
 
         if status == 'bad':
             if options.retest:
-                sys.stdout.write(
+                sys.stderr.write(
                     'Tree %s^{tree} was previously tested to be bad; retesting...\n'
                     % (rs,)
                     )
                 status = 'unknown'
                 # fall through
             else:
-                sys.stdout.write('Tree %s^{tree} is already known to be bad!\n' % (rs,))
+                sys.stderr.write('Tree %s^{tree} is already known to be bad!\n' % (rs,))
                 status = 'failed'
                 if options.keep_going:
                     fail_count += 1
@@ -591,21 +590,21 @@ def cmd_run(parser, options):
 
     if not testing_head:
         cmd = ['git', 'checkout', '-f', re.sub(r'^refs/heads/', '', head)]
-        check_call(cmd)
+        check_call(cmd, stdout=sys.stderr)
 
-    sys.stdout.write('\n')
+    sys.stderr.write('\n')
     if fail_count > 0:
         if fail_count == 1:
-            sys.stdout.write('!!! %s TEST FAILED !!!\n' % (fail_count,))
+            sys.stderr.write('!!! %s TEST FAILED !!!\n' % (fail_count,))
         else:
-            sys.stdout.write('!!! %s TESTS FAILED !!!\n' % (fail_count,))
+            sys.stderr.write('!!! %s TESTS FAILED !!!\n' % (fail_count,))
 
         if last_failure is not None:
             sys.exit(last_failure)
         else:
             sys.exit(1)
     else:
-        sys.stdout.write('ALL TESTS SUCCESSFUL\n')
+        sys.stderr.write('ALL TESTS SUCCESSFUL\n')
         return
 
 
