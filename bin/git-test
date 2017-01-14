@@ -300,6 +300,17 @@ class Test(object):
         self.full_ref = 'refs/notes/tests/%s' % (self.name,)
         self._command = None
 
+    def initialize_status(self, msg):
+        cmd = ['git', 'commit-tree', '-m', msg, get_empty_tree()]
+        commit = check_output(cmd).rstrip()
+
+        cmd = [
+            'git', 'update-ref',
+            '-m', 'test: %s' % (msg,),
+            self.full_ref, commit,
+            ]
+        check_call(cmd)
+
     def read_status(self, revision, revision_short):
         cmd = [
             'git', 'notes', '--ref=%s' % (self.notes_ref,),
@@ -394,18 +405,6 @@ def prepare_revision(r):
         raise Fatal('fatal: error displaying log for commit %s' % (r,))
 
 
-def initialize_notes(name, msg):
-    cmd = ['git', 'commit-tree', '-m', msg, get_empty_tree()]
-    commit = check_output(cmd).rstrip()
-
-    cmd = [
-        'git', 'update-ref',
-        '-m', 'test: %s' % (msg,),
-        'refs/notes/tests/%s' % (name,), commit,
-        ]
-    check_call(cmd)
-
-
 def remove_notes(name, msg):
     """Delete the note reference for the test named `name`."""
 
@@ -445,7 +444,7 @@ def cmd_add(parser, options):
                 sys.stderr.write(REUSE_RESULTS_WARNING % dict(name=test.name))
 
     if initialize:
-        initialize_notes(test.name, 'Test results initialized by \'git test add\'')
+        test.initialize_status('Test results initialized by \'git test add\'')
 
 
 def uniqify(l):
@@ -611,8 +610,8 @@ def cmd_forget_results(parser, options):
             test.name, 'Test results deleted by \'git test forget-results\''
             )
     else:
-        initialize_notes(
-            test.name, 'Test results reinitialized by \'git test forget-results\''
+        test.initialize_status(
+            'Test results reinitialized by \'git test forget-results\''
             )
 
 
