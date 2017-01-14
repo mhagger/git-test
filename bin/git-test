@@ -280,69 +280,135 @@ def require_clean_work_tree(action):
         raise UncleanWorkTreeError('\n'.join(error))
 
 
-notes_ref = None
+FAIL_HEADER_TEMPLATE = """\
 
-def read_status(r, rs):
-    if notes_ref is None:
-        return 'unknown'
+*******************************************************************************
+FAILED ON COMMIT %(revision)s
 
-    cmd = ['git', 'notes', '--ref=%s' % (notes_ref,), 'show', '%s^{tree}' % (r,)]
-    try:
-        status = check_output(cmd, stderr=open(os.devnull, 'wb')).rstrip()
-    except CalledProcessError:
-        return 'unknown'
+"""
 
-    if status not in ['good', 'bad']:
-        raise Fatal('fatal: unrecognized status %r for tree %s^{tree}!' % (status, rs))
+FAIL_TRAILER_TEMPLATE = """\
+*******************************************************************************
 
-    return status
+FAILURE!
+"""
 
+class Test(object):
+    def __init__(self, name):
+        self.name = name
+        self.notes_ref = 'tests/%s' % (self.name,)
+        self.full_ref = 'refs/notes/tests/%s' % (self.name,)
+        self._command = None
 
-def write_note(r, value):
-    if notes_ref is None:
-        return
+    def initialize_status(self, msg):
+        cmd = ['git', 'commit-tree', '-m', msg, get_empty_tree()]
+        commit = check_output(cmd).rstrip()
 
-    cmd = [
-        'git', 'notes', '--ref=%s' % (notes_ref,),
-        'add', '-f', '%s^{tree}' % (r,), '-m', value,
-        ]
-    try:
+        cmd = [
+            'git', 'update-ref',
+            '-m', 'test: %s' % (msg,),
+            self.full_ref, commit,
+            ]
         check_call(cmd)
-    except CalledProcessError:
-        raise Fatal('fatal: error adding note to %s^{tree}' % (r,))
-    else:
-        sys.stderr.write('Marked tree %s^{tree} to be %s\n' % (r, value))
 
+    def read_status(self, revision, revision_short):
+        cmd = [
+            'git', 'notes', '--ref=%s' % (self.notes_ref,),
+            'show', '%s^{tree}' % (revision,),
+            ]
+        try:
+            status = check_output(cmd, stderr=open(os.devnull, 'wb')).rstrip()
+        except CalledProcessError:
+            return 'unknown'
 
-def forget_notes(revisions):
-    """Forget the notes on the specified revisions (if any)."""
+        if status not in ['good', 'bad']:
+            raise Fatal(
+                'fatal: unrecognized status %r for tree %s^{tree}!'
+                % (status, revision_short),
+                )
 
-    cmd = [
-        'git', 'notes', '--ref=%s' % (notes_ref,),
-        'remove', '--ignore-missing', '--stdin',
-        ]
+        return status
 
-    try:
-        process = subprocess.Popen(cmd, stdin=subprocess.PIPE)
-        process.communicate(''.join('%s^{tree}\n' % (r,) for r in revisions))
-        retcode = process.poll()
-        if retcode:
+    def write_status(self, revision, value):
+        cmd = [
+            'git', 'notes', '--ref=%s' % (self.notes_ref,),
+            'add', '-f', '%s^{tree}' % (revision,), '-m', value,
+            ]
+        try:
+            check_call(cmd)
+        except CalledProcessError:
+            raise Fatal('fatal: error adding note to %s^{tree}' % (revision,))
+        else:
+            sys.stderr.write('Marked tree %s^{tree} to be %s\n' % (revision, value))
+
+    def forget_status(self, revisions):
+        """Forget the stored results (if any) for the specified revisions."""
+
+        cmd = [
+            'git', 'notes', '--ref=%s' % (self.notes_ref,),
+            'remove', '--ignore-missing', '--stdin',
+            ]
+
+        try:
+            process = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+            process.communicate(''.join('%s^{tree}\n' % (r,) for r in revisions))
+            retcode = process.poll()
+            if retcode:
+                raise Fatal('fatal: error removing one or more existing notes')
+        except CalledProcessError:
             raise Fatal('fatal: error removing one or more existing notes')
-    except CalledProcessError:
-        raise Fatal('fatal: error removing one or more existing notes')
 
+    @property
+    def command(self):
+        if self._command is None:
+            cmd = ['git', 'config', '--get', 'test.%s.command' % (self.name,)]
+            try:
+                self._command = check_output(cmd).rstrip()
+            except CalledProcessError:
+                raise Fatal('fatal: test %s is not defined!' % (self.name,))
+        return self._command
 
-def test():
-    """Test the current contents of the working tree."""
-
-    if command is None:
-        raise Fatal('fatal: no test command configured')
-
-    cmd = ['sh', '-c', command]
-    try:
+    @command.setter
+    def command(self, value):
+        cmd = ['git', 'config', 'test.%s.command' % (self.name,), value]
         check_call(cmd)
-    except CalledProcessError as e:
-        raise UserTestError(e.returncode, e.cmd, e.output)
+        self._command = value
+
+    def run(self):
+        """Run this test against the current contents of the working tree."""
+
+        cmd = ['sh', '-c', self.command]
+        try:
+            check_call(cmd)
+        except CalledProcessError as e:
+            raise UserTestError(e.returncode, e.cmd, e.output)
+
+    def run_and_record(self, revision):
+        try:
+            self.run()
+        except UserTestError as e:
+            cmd = ['git', '--no-pager', 'log', '-1', '--decorate', revision]
+            sys.stdout.write(FAIL_HEADER_TEMPLATE % dict(revision=revision))
+            check_call(cmd)
+            sys.stdout.write(FAIL_TRAILER_TEMPLATE % dict())
+            self.write_status(revision, 'bad')
+            raise
+        else:
+            self.write_status(revision, 'good')
+
+    def remove_status(self, msg):
+        """Delete the note reference for this test."""
+
+        cmd = [
+            'git', 'update-ref', '-d', 'refs/notes/tests/%s' % (self.name,),
+            '-m', msg,
+            ]
+        check_call(cmd)
+
+    def remove(self, msg):
+        cmd = ['git', 'config', '--remove-section', 'test.%s' % (self.name,)]
+        check_call(cmd)
+        self.remove_status(msg)
 
 
 def prepare_revision(r):
@@ -359,65 +425,6 @@ def prepare_revision(r):
         raise Fatal('fatal: error displaying log for commit %s' % (r,))
 
 
-FAIL_HEADER_TEMPLATE = """\
-
-*******************************************************************************
-FAILED ON COMMIT %(r)s
-
-"""
-
-FAIL_TRAILER_TEMPLATE = """\
-*******************************************************************************
-
-FAILURE!
-"""
-
-def test_and_record(r):
-    try:
-        test()
-    except UserTestError as e:
-        cmd = ['git', '--no-pager', 'log', '-1', '--decorate', r]
-        sys.stdout.write(FAIL_HEADER_TEMPLATE % dict(r=r))
-        check_call(cmd)
-        sys.stdout.write(FAIL_TRAILER_TEMPLATE % dict())
-        write_note(r, 'bad')
-        raise
-    else:
-        write_note(r, 'good')
-
-
-def setup_test(name):
-    global notes_ref, command
-
-    notes_ref = 'tests/%s' % (name,)
-    cmd = ['git', 'config', '--get', 'test.%s.command' % (name,)]
-    try:
-        command = check_output(cmd).rstrip()
-    except CalledProcessError:
-        raise Fatal('fatal: test %s is not defined!' % (name,))
-
-    sys.stdout.write('Using test %s; command: %s\n' % (name, command))
-
-
-def initialize_notes(name, msg):
-    cmd = ['git', 'commit-tree', '-m', msg, get_empty_tree()]
-    commit = check_output(cmd).rstrip()
-
-    cmd = [
-        'git', 'update-ref',
-        '-m', 'test: %s' % (msg,),
-        'refs/notes/tests/%s' % (name,), commit,
-        ]
-    check_call(cmd)
-
-
-def remove_notes(name, msg):
-    """Delete the note reference for the test named `name`."""
-
-    cmd = ['git', 'update-ref', '-d', 'refs/notes/tests/%s' % (name,), '-m', msg]
-    check_call(cmd)
-
-
 REUSE_RESULTS_WARNING = """\
 WARNING: there are already results stored for the test named '%(name)s'.
 Those results will be considered valid for the new test. If that is
@@ -426,14 +433,15 @@ not what you want, please re-run this command with the '--forget' option.
 
 
 def cmd_add(parser, options):
-    cmd = ['git', 'config', 'test.%s.command' % (options.test,), options.command]
-    check_call(cmd)
+    test = Test(options.test)
+
+    test.command = options.command
 
     if options.forget:
         initialize = True
     else:
         try:
-            old_tree = rev_parse('refs/notes/tests/%s^{tree}' % (options.test,))
+            old_tree = rev_parse('%s^{tree}' % (test.full_ref,))
         except RevParseError:
             initialize = True
         else:
@@ -445,10 +453,10 @@ def cmd_add(parser, options):
                 # results and the user didn't explicitly ask for
                 # `--keep`; emit a warning in case the user forgot to
                 # `--forget`:
-                sys.stderr.write(REUSE_RESULTS_WARNING % dict(name=options.test))
+                sys.stderr.write(REUSE_RESULTS_WARNING % dict(name=test.name))
 
     if initialize:
-        initialize_notes(options.test, 'Test results initialized by \'git test add\'')
+        test.initialize_status('Test results initialized by \'git test add\'')
 
 
 def uniqify(l):
@@ -464,7 +472,9 @@ def uniqify(l):
 
 
 def cmd_run(parser, options):
-    setup_test(options.test)
+    test = Test(options.test)
+
+    sys.stderr.write('Using test %s; command: %s\n' % (test.name, test.command))
 
     try:
         require_clean_work_tree('test-run')
@@ -475,7 +485,7 @@ def cmd_run(parser, options):
             raise
 
         try:
-            test()
+            test.run()
         except UserTestError as e:
             sys.stdout.write('\n!!! TEST FAILED !!!\n')
             sys.exit(e.returncode)
@@ -531,7 +541,7 @@ def cmd_run(parser, options):
         head = check_output(cmd).rstrip()
 
     if options.force or options.forget:
-        forget_notes(revisions)
+        test.forget_status(revisions)
 
         if options.forget:
             return
@@ -542,7 +552,7 @@ def cmd_run(parser, options):
     for r in revisions:
         cmd = ['git', 'rev-parse', '--short', r]
         rs = check_output(cmd).rstrip()
-        status = read_status(r, rs)
+        status = test.read_status(r, rs)
         sys.stdout.write('Old status: %s\n' % (status,))
 
         if status == 'good':
@@ -570,7 +580,7 @@ def cmd_run(parser, options):
                 prepare_revision(r)
 
             try:
-                test_and_record(r)
+                test.run_and_record(r)
             except UserTestError as e:
                 # This commit has failed the test.
                 if options.keep_going:
@@ -600,27 +610,25 @@ def cmd_run(parser, options):
 
 
 def cmd_forget_results(parser, options):
-    cmd = ['git', 'config', 'test.%s.command' % (options.test,)]
+    test = Test(options.test)
+
+    cmd = ['git', 'config', 'test.%s.command' % (test.name,)]
     try:
         check_call(cmd, stdout=open(os.devnull, 'wb'))
         test_defined = True
     except CalledProcessError:
         # There is no test defined; simply delete the notes reference:
-        remove_notes(
-            options.test, 'Test results deleted by \'git test forget-results\''
-            )
+        test.remove_status('Test results deleted by \'git test forget-results\'')
     else:
-        initialize_notes(
-            options.test, 'Test results reinitialized by \'git test forget-results\''
+        test.initialize_status(
+            'Test results reinitialized by \'git test forget-results\''
             )
 
 
 def cmd_remove(parser, options):
-    cmd = ['git', 'config', '--remove-section', 'test.%s' % (options.test,)]
-    check_call(cmd)
-    remove_notes(
-        options.test, 'Test results deleted by \'git test remove\''
-        )
+    test = Test(options.test)
+
+    test.remove('Test results deleted by \'git test remove\'')
 
 
 def cmd_help(parser, options, subparsers):
