@@ -396,6 +396,15 @@ class Test(object):
         else:
             self.write_status(revision, 'good')
 
+    def remove_status(self, msg):
+        """Delete the note reference for this test."""
+
+        cmd = [
+            'git', 'update-ref', '-d', 'refs/notes/tests/%s' % (self.name,),
+            '-m', msg,
+            ]
+        check_call(cmd)
+
 
 def prepare_revision(r):
     cmd = ['git', 'checkout', r]
@@ -409,13 +418,6 @@ def prepare_revision(r):
         check_call(cmd)
     except CalledProcessError as e:
         raise Fatal('fatal: error displaying log for commit %s' % (r,))
-
-
-def remove_notes(name, msg):
-    """Delete the note reference for the test named `name`."""
-
-    cmd = ['git', 'update-ref', '-d', 'refs/notes/tests/%s' % (name,), '-m', msg]
-    check_call(cmd)
 
 
 REUSE_RESULTS_WARNING = """\
@@ -611,9 +613,7 @@ def cmd_forget_results(parser, options):
         test_defined = True
     except CalledProcessError:
         # There is no test defined; simply delete the notes reference:
-        remove_notes(
-            test.name, 'Test results deleted by \'git test forget-results\''
-            )
+        test.remove_status('Test results deleted by \'git test forget-results\'')
     else:
         test.initialize_status(
             'Test results reinitialized by \'git test forget-results\''
@@ -625,9 +625,7 @@ def cmd_remove(parser, options):
 
     cmd = ['git', 'config', '--remove-section', 'test.%s' % (test.name,)]
     check_call(cmd)
-    remove_notes(
-        test.name, 'Test results deleted by \'git test remove\''
-        )
+    test.remove_status('Test results deleted by \'git test remove\'')
 
 
 def cmd_help(parser, options, subparsers):
