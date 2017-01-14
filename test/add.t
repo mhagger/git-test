@@ -50,13 +50,38 @@ test_expect_success 'With --keep, silently keep old results' '
 	git notes --ref=tests/default show HEAD^{tree}
 '
 
-test_expect_success 'Forget old results' '
+test_expect_success 'With --forget, forget old results' '
 	git-test add --forget "echo forget" 2>warning &&
 	test_must_fail grep -q "there are already results" warning &&
 	echo "echo forget" >expected &&
 	git config --get test.default.command >actual &&
 	test_cmp expected actual &&
-	test_must_fail git notes --ref=tests/default show HEAD^{tree}
+	git rev-parse --verify --quiet refs/notes/tests/default^{tree} >tree &&
+	test_cmp empty_tree tree
+'
+
+test_expect_success 'forget-results' '
+	# Add some simulated test results:
+	git notes --ref=tests/default add -m 'good' HEAD^{tree} &&
+	git-test forget-results &&
+	echo "echo forget" >expected &&
+	git config --get test.default.command >actual &&
+	test_cmp expected actual &&
+	git rev-parse --verify --quiet refs/notes/tests/default^{tree} >tree &&
+	test_cmp empty_tree tree
+'
+
+test_expect_success 'Remove the default test' '
+	git-test remove &&
+	test_must_fail git config --get test.default.command &&
+	test_must_fail git rev-parse --verify --quiet refs/notes/tests/default
+'
+
+test_expect_success 'forget-results for an undefined test' '
+	# Add some simulated test results:
+	git notes --ref=tests/imnotatest add -m 'good' HEAD^{tree} &&
+	git-test forget-results --test=imnotatest &&
+	test_must_fail git rev-parse --verify --quiet refs/notes/tests/imnotatest
 '
 
 test_expect_success 'Configure a different test' '
