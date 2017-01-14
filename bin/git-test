@@ -199,6 +199,22 @@ def rev_list(*args):
         raise Fatal('git rev-list %s failed' % (' '.join(args),))
 
 
+_empty_tree = None
+
+def get_empty_tree():
+    """Return the SHA-1 for the empty tree object.
+
+    Also make sure it is present in the current repository."""
+
+    global _empty_tree
+
+    if _empty_tree is None:
+        cmd = ['git', 'hash-object', '-t', 'tree', '-w', '--stdin']
+        _empty_tree = check_output(cmd, stdin=open(os.devnull, 'rb')).rstrip()
+
+    return _empty_tree
+
+
 def refresh_index():
     process = subprocess.Popen(
         ['git', 'update-index', '-q', '--ignore-submodules', '--refresh'],
@@ -383,9 +399,49 @@ def setup_test(name):
     sys.stdout.write('Using test %s; command: %s\n' % (name, command))
 
 
+def initialize_notes(name, msg):
+    cmd = ['git', 'commit-tree', '-m', msg, get_empty_tree()]
+    commit = check_output(cmd).rstrip()
+
+    cmd = [
+        'git', 'update-ref',
+        '-m', 'test: %s' % (msg,),
+        'refs/notes/tests/%s' % (name,), commit,
+        ]
+    check_call(cmd)
+
+
+REUSE_RESULTS_WARNING = """\
+WARNING: there are already results stored for the test named '%(name)s'.
+Those results will be considered valid for the new test. If that is
+not what you want, please re-run this command with the '--forget' option.
+"""
+
+
 def cmd_add(parser, options):
     cmd = ['git', 'config', 'test.%s.command' % (options.test,), options.command]
     check_call(cmd)
+
+    if options.forget:
+        initialize = True
+    else:
+        try:
+            old_tree = rev_parse('refs/notes/tests/%s^{tree}' % (options.test,))
+        except RevParseError:
+            initialize = True
+        else:
+            # The notes reference already exists and we weren't asked
+            # to `--forget`, so leave the existing notes in place:
+            initialize = False
+            if old_tree != get_empty_tree() and options.forget != False:
+                # The notes reference already exists and contains
+                # results and the user didn't explicitly ask for
+                # `--keep`; emit a warning in case the user forgot to
+                # `--forget`:
+                sys.stderr.write(REUSE_RESULTS_WARNING % dict(name=options.test))
+
+    if initialize:
+        initialize_notes(options.test, 'Test results initialized by \'git test add\'')
 
 
 def uniqify(l):
@@ -570,6 +626,16 @@ def main(args):
         '--test', '-t', metavar='name',
         action='store', default='default',
         help='name of test to add',
+        )
+    subparser.add_argument(
+        '--forget',
+        action='store_true', default=None,
+        help='forget any existing results',
+        )
+    subparser.add_argument(
+        '--keep',
+        action='store_false', dest='forget',
+        help='keep any existing results (default)',
         )
     subparser.add_argument(
         'command',
