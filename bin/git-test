@@ -58,6 +58,7 @@ It will only test commits with trees that it hasn't been seen before.
 
 import locale
 import sys
+import os
 import re
 import subprocess
 import argparse
@@ -162,6 +163,10 @@ def check_git_output(*popenargs, **kwargs):
     return _decode_output(check_output(*popenargs, **kwargs))
 
 
+class RevParseError(Fatal):
+    pass
+
+
 def rev_parse(arg, abbrev=None):
     if abbrev:
         cmd = ['git', 'rev-parse', '--verify', '-q', '--short=%d' % (abbrev,), arg]
@@ -171,7 +176,7 @@ def rev_parse(arg, abbrev=None):
     try:
         return check_git_output(cmd).strip()
     except CalledProcessError:
-        raise Fatal('%r is not a valid commit!' % (arg,))
+        raise RevParseError('%r is not a valid commit!' % (arg,))
 
 
 def rev_list(*args):
@@ -192,6 +197,22 @@ def rev_list(*args):
     retcode = process.wait()
     if retcode:
         raise Fatal('git rev-list %s failed' % (' '.join(args),))
+
+
+_empty_tree = None
+
+def get_empty_tree():
+    """Return the SHA-1 for the empty tree object.
+
+    Also make sure it is present in the current repository."""
+
+    global _empty_tree
+
+    if _empty_tree is None:
+        cmd = ['git', 'hash-object', '-t', 'tree', '-w', '--stdin']
+        _empty_tree = check_output(cmd, stdin=open(os.devnull, 'rb')).rstrip()
+
+    return _empty_tree
 
 
 def refresh_index():
@@ -267,7 +288,7 @@ def read_status(r, rs):
 
     cmd = ['git', 'notes', '--ref=%s' % (notes_ref,), 'show', '%s^{tree}' % (r,)]
     try:
-        status = check_output(cmd, stderr=open('/dev/null', 'wb')).rstrip()
+        status = check_output(cmd, stderr=open(os.devnull, 'wb')).rstrip()
     except CalledProcessError:
         return 'unknown'
 
@@ -378,9 +399,56 @@ def setup_test(name):
     sys.stdout.write('Using test %s; command: %s\n' % (name, command))
 
 
+def initialize_notes(name, msg):
+    cmd = ['git', 'commit-tree', '-m', msg, get_empty_tree()]
+    commit = check_output(cmd).rstrip()
+
+    cmd = [
+        'git', 'update-ref',
+        '-m', 'test: %s' % (msg,),
+        'refs/notes/tests/%s' % (name,), commit,
+        ]
+    check_call(cmd)
+
+
+def remove_notes(name, msg):
+    """Delete the note reference for the test named `name`."""
+
+    cmd = ['git', 'update-ref', '-d', 'refs/notes/tests/%s' % (name,), '-m', msg]
+    check_call(cmd)
+
+
+REUSE_RESULTS_WARNING = """\
+WARNING: there are already results stored for the test named '%(name)s'.
+Those results will be considered valid for the new test. If that is
+not what you want, please re-run this command with the '--forget' option.
+"""
+
+
 def cmd_add(parser, options):
     cmd = ['git', 'config', 'test.%s.command' % (options.test,), options.command]
     check_call(cmd)
+
+    if options.forget:
+        initialize = True
+    else:
+        try:
+            old_tree = rev_parse('refs/notes/tests/%s^{tree}' % (options.test,))
+        except RevParseError:
+            initialize = True
+        else:
+            # The notes reference already exists and we weren't asked
+            # to `--forget`, so leave the existing notes in place:
+            initialize = False
+            if old_tree != get_empty_tree() and options.forget != False:
+                # The notes reference already exists and contains
+                # results and the user didn't explicitly ask for
+                # `--keep`; emit a warning in case the user forgot to
+                # `--forget`:
+                sys.stderr.write(REUSE_RESULTS_WARNING % dict(name=options.test))
+
+    if initialize:
+        initialize_notes(options.test, 'Test results initialized by \'git test add\'')
 
 
 def uniqify(l):
@@ -457,7 +525,7 @@ def cmd_run(parser, options):
 
     try:
         cmd = ['git', 'symbolic-ref', 'HEAD']
-        head = check_output(cmd, stderr=open('/dev/null', 'wb')).rstrip()
+        head = check_output(cmd, stderr=open(os.devnull, 'wb')).rstrip()
     except CalledProcessError:
         cmd = ['git', 'rev-parse', 'HEAD']
         head = check_output(cmd).rstrip()
@@ -531,6 +599,30 @@ def cmd_run(parser, options):
         return
 
 
+def cmd_forget_results(parser, options):
+    cmd = ['git', 'config', 'test.%s.command' % (options.test,)]
+    try:
+        check_call(cmd, stdout=open(os.devnull, 'wb'))
+        test_defined = True
+    except CalledProcessError:
+        # There is no test defined; simply delete the notes reference:
+        remove_notes(
+            options.test, 'Test results deleted by \'git test forget-results\''
+            )
+    else:
+        initialize_notes(
+            options.test, 'Test results reinitialized by \'git test forget-results\''
+            )
+
+
+def cmd_remove(parser, options):
+    cmd = ['git', 'config', '--remove-section', 'test.%s' % (options.test,)]
+    check_call(cmd)
+    remove_notes(
+        options.test, 'Test results deleted by \'git test remove\''
+        )
+
+
 def cmd_help(parser, options, subparsers):
     if options.cmd is not None:
         try:
@@ -564,7 +656,17 @@ def main(args):
     subparser.add_argument(
         '--test', '-t', metavar='name',
         action='store', default='default',
-        help='name of test to add',
+        help='name of test to add (default is \'default\')',
+        )
+    subparser.add_argument(
+        '--forget',
+        action='store_true', default=None,
+        help='forget any existing results',
+        )
+    subparser.add_argument(
+        '--keep',
+        action='store_false', dest='forget',
+        help='keep any existing results (default)',
         )
     subparser.add_argument(
         'command',
@@ -575,7 +677,7 @@ def main(args):
         subparser.add_argument(
             '--test', '-t', metavar='name',
             action='store', default='default',
-            help='name of test',
+            help='name of test (default is \'default\')',
             )
         subparser.add_argument(
             '--force', '-f', action='store_true',
@@ -635,6 +737,32 @@ def main(args):
     add_run_arguments(subparser)
 
     subparser = subparsers.add_parser(
+        'forget-results',
+        description=(
+            'Forget all stored test results for a test.'
+            ),
+        help='permanently forget stored results for a test',
+        )
+    subparser.add_argument(
+        '--test', '-t', metavar='name',
+        action='store', default='default',
+        help='name of test whose results should be forgotten (default is \'default\')',
+        )
+
+    subparser = subparsers.add_parser(
+        'remove',
+        description=(
+            'Remove a test definition and all of its stored results.'
+            ),
+        help='remove a test definition and all of its stored results',
+        )
+    subparser.add_argument(
+        '--test', '-t', metavar='name',
+        action='store', default='default',
+        help='name of test to remove (default is \'default\')',
+        )
+
+    subparser = subparsers.add_parser(
         'help',
         description=(
             'Print out help for "git test" in general or for a specific '
@@ -655,6 +783,10 @@ def main(args):
         cmd_run(parser, options)
     elif options.subcommand == 'range':
         parser.error('the \'range\' subcommand has been renamed to \'run\'.')
+    elif options.subcommand == 'forget-results':
+        cmd_forget_results(parser, options)
+    elif options.subcommand == 'remove':
+        cmd_remove(parser, options)
     elif options.subcommand == 'help':
         cmd_help(parser, options, subparsers)
     else:

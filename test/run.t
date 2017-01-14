@@ -81,7 +81,7 @@ test_expect_success 'default (passing): retest forgotten commits' '
 '
 
 test_expect_success 'default (passing): test a single commit' '
-	git update-ref -d refs/notes/tests/default &&
+	git-test forget-results &&
 	rm -f numbers.log &&
 	git-test run c5 &&
 	printf "default %s${LF}" 5 >expected &&
@@ -89,7 +89,7 @@ test_expect_success 'default (passing): test a single commit' '
 '
 
 test_expect_success 'default (passing): test a few single commits' '
-	git update-ref -d refs/notes/tests/default &&
+	git-test forget-results &&
 	rm -f numbers.log &&
 	git-test run c2 c6 c4 &&
 	printf "default %s${LF}" 2 6 4 >expected &&
@@ -97,7 +97,7 @@ test_expect_success 'default (passing): test a few single commits' '
 '
 
 test_expect_success 'default (passing): test a single commit and a range' '
-	git update-ref -d refs/notes/tests/default &&
+	git-test forget-results &&
 	rm -f numbers.log &&
 	git-test run c9 c4..c6 &&
 	printf "default %s${LF}" 9 5 6 >expected &&
@@ -105,7 +105,7 @@ test_expect_success 'default (passing): test a single commit and a range' '
 '
 
 test_expect_success 'default (passing): commits uniqified' '
-	git update-ref -d refs/notes/tests/default &&
+	git-test forget-results &&
 	rm -f numbers.log &&
 	git-test run c4..c6 c8 c5 c3..c9 &&
 	printf "default %s${LF}" 5 6 8 4 7 9 >expected &&
@@ -113,7 +113,7 @@ test_expect_success 'default (passing): commits uniqified' '
 '
 
 test_expect_success 'default (passing): read commits from stdin' '
-	git update-ref -d refs/notes/tests/default &&
+	git-test forget-results &&
 	rm -f numbers.log &&
 	git rev-list c2..c6 | git-test run --stdin &&
 	printf "default %s${LF}" 6 5 4 3 >expected &&
@@ -121,7 +121,7 @@ test_expect_success 'default (passing): read commits from stdin' '
 '
 
 test_expect_success 'default (passing): combine args and stdin' '
-	git update-ref -d refs/notes/tests/default &&
+	git-test forget-results &&
 	rm -f numbers.log &&
 	git rev-list c2..c6 | git-test run --stdin c5 c8 &&
 	# Note that rev-list was called without --reverse:
@@ -130,7 +130,7 @@ test_expect_success 'default (passing): combine args and stdin' '
 '
 
 test_expect_success 'default (failing-4-7-8): test range' '
-	git update-ref -d refs/notes/tests/default &&
+	git-test forget-results &&
 	git-test add "test-number --log=numbers.log --bad 4 7 8 666 --good \*" &&
 	rm -f numbers.log &&
 	test_expect_code 1 git-test run c2..c5 &&
@@ -177,7 +177,7 @@ test_expect_success 'default (failing-4-7-8): retest with --force' '
 '
 
 test_expect_success 'default (failing-4-7-8): test --keep-going' '
-	git update-ref -d refs/notes/tests/default &&
+	git-test forget-results &&
 	rm -f numbers.log &&
 	test_expect_code 1 git-test run --keep-going c2..c9 &&
 	printf "default %s${LF}" 3 4 5 6 7 8 9 >expected &&
@@ -203,7 +203,7 @@ test_expect_success 'default (failing-4-7-8): retest disjoint commits with --kee
 '
 
 test_expect_success 'default (failing-4-7-8): test passing HEAD' '
-	git update-ref -d refs/notes/tests/default &&
+	git-test forget-results &&
 	rm -f numbers.log &&
 	git checkout c2 &&
 	git symbolic-ref HEAD >expected-branch &&
@@ -217,7 +217,7 @@ test_expect_success 'default (failing-4-7-8): test passing HEAD' '
 '
 
 test_expect_success 'default (failing-4-7-8): test failing HEAD' '
-	git update-ref -d refs/notes/tests/default &&
+	git-test forget-results &&
 	rm -f numbers.log &&
 	git checkout c4 &&
 	git symbolic-ref HEAD >expected-branch &&
@@ -231,7 +231,7 @@ test_expect_success 'default (failing-4-7-8): test failing HEAD' '
 '
 
 test_expect_success 'default (failing-4-7-8): test failing explicit HEAD' '
-	git update-ref -d refs/notes/tests/default &&
+	git-test forget-results &&
 	rm -f numbers.log &&
 	git checkout c4 &&
 	git symbolic-ref HEAD >expected-branch &&
@@ -245,7 +245,7 @@ test_expect_success 'default (failing-4-7-8): test failing explicit HEAD' '
 '
 
 test_expect_success 'default (failing-4-7-8): test passing dirty working copy' '
-	git update-ref -d refs/notes/tests/default &&
+	git-test forget-results &&
 	rm -f numbers.log &&
 	git checkout c4 &&
 	git symbolic-ref HEAD >expected-branch &&
@@ -260,7 +260,7 @@ test_expect_success 'default (failing-4-7-8): test passing dirty working copy' '
 '
 
 test_expect_success 'default (failing-4-7-8): test failing dirty working copy' '
-	git update-ref -d refs/notes/tests/default &&
+	git-test forget-results &&
 	rm -f numbers.log &&
 	git checkout c2 &&
 	git symbolic-ref HEAD >expected-branch &&
@@ -275,7 +275,7 @@ test_expect_success 'default (failing-4-7-8): test failing dirty working copy' '
 '
 
 test_expect_success 'default (retcodes): test range' '
-	git update-ref -d refs/notes/tests/default &&
+	git-test forget-results &&
 	git-test add "test-number --log=numbers.log --bad 3 7 --ret=42 5 --good \*" &&
 	rm -f numbers.log &&
 	test_expect_code 42 git-test run c3..c6 &&

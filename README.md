@@ -61,11 +61,23 @@ You can define multiple tests in a single repository (e.g., cheap vs. expensive 
 
 ### Retrying tests and/or forgetting old test results
 
-If you have flaky tests that occasionally fail for bogus reasons, you might want to re-run the test against a commit even though `git test` has already recorded a result for that commit. To do so, run `git test run` with the `--force`/`-f` or `--retest` options. If you want to forget old test results without retesting (e.g., if you change the test command), use `--forget`.
+If you have flaky tests that occasionally fail for bogus reasons, you might want to re-run the test against a commit even though `git test` has already recorded a result for that commit. To do so, run `git test run` with the `--force`/`-f` or `--retest` options.
+
+If you want to forget particular old test results without retesting, run `git test run` with the `--forget` option.
+
+If you want to permanently forget *all* stored results for a particular test (e.g., if something in your environment has changed), run
+
+    git test forget-results [--test=<name>]
 
 ### Continue on test failures
 
 Normally, `git test run` stops at the first broken commit that it finds. If you'd prefer for it to continue, use the `--keep-going`/`-k` option.
+
+### Removing tests
+
+To permanently remove a test definition and all of its stored results, run
+
+    git test remove [--test=<name>]
 
 ### For help
 
@@ -112,8 +124,6 @@ Some other features that would be nice:
 *   Be more consistent about restoring `HEAD`. `git test run` currently checks out the branch that you started on when it is finished, but only if all of the tests passed. We need some kind of `git test reset` command analogous to `git bisect reset`.
 
 *   `git test bisect`: run `git bisect run` against a range of commits, using a configured test as the command that `bisect` uses to decide whether a commit is good/bad.
-
-*   `git test remove`: remove a test definition and its associated notes.
 
 *   `git test prune`: delete notes for obsolete trees.
 
