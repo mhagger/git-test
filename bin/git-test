@@ -163,6 +163,10 @@ def check_git_output(*popenargs, **kwargs):
     return _decode_output(check_output(*popenargs, **kwargs))
 
 
+class RevParseError(Fatal):
+    pass
+
+
 def rev_parse(arg, abbrev=None):
     if abbrev:
         cmd = ['git', 'rev-parse', '--verify', '-q', '--short=%d' % (abbrev,), arg]
@@ -172,7 +176,7 @@ def rev_parse(arg, abbrev=None):
     try:
         return check_git_output(cmd).strip()
     except CalledProcessError:
-        raise Fatal('%r is not a valid commit!' % (arg,))
+        raise RevParseError('%r is not a valid commit!' % (arg,))
 
 
 def rev_list(*args):
