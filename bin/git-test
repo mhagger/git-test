@@ -280,6 +280,19 @@ def require_clean_work_tree(action):
         raise UncleanWorkTreeError('\n'.join(error))
 
 
+FAIL_HEADER_TEMPLATE = """\
+
+*******************************************************************************
+FAILED ON COMMIT %(revision)s
+
+"""
+
+FAIL_TRAILER_TEMPLATE = """\
+*******************************************************************************
+
+FAILURE!
+"""
+
 class Test(object):
     def __init__(self, name):
         self.name = name
@@ -353,6 +366,19 @@ class Test(object):
         except CalledProcessError as e:
             raise UserTestError(e.returncode, e.cmd, e.output)
 
+    def run_and_record(self, revision):
+        try:
+            self.run()
+        except UserTestError as e:
+            cmd = ['git', '--no-pager', 'log', '-1', '--decorate', revision]
+            sys.stdout.write(FAIL_HEADER_TEMPLATE % dict(revision=revision))
+            check_call(cmd)
+            sys.stdout.write(FAIL_TRAILER_TEMPLATE % dict())
+            self.write_status(revision, 'bad')
+            raise
+        else:
+            self.write_status(revision, 'good')
+
 
 def prepare_revision(r):
     cmd = ['git', 'checkout', r]
@@ -366,33 +392,6 @@ def prepare_revision(r):
         check_call(cmd)
     except CalledProcessError as e:
         raise Fatal('fatal: error displaying log for commit %s' % (r,))
-
-
-FAIL_HEADER_TEMPLATE = """\
-
-*******************************************************************************
-FAILED ON COMMIT %(r)s
-
-"""
-
-FAIL_TRAILER_TEMPLATE = """\
-*******************************************************************************
-
-FAILURE!
-"""
-
-def test_and_record(r):
-    try:
-        test.run()
-    except UserTestError as e:
-        cmd = ['git', '--no-pager', 'log', '-1', '--decorate', r]
-        sys.stdout.write(FAIL_HEADER_TEMPLATE % dict(r=r))
-        check_call(cmd)
-        sys.stdout.write(FAIL_TRAILER_TEMPLATE % dict())
-        test.write_status(r, 'bad')
-        raise
-    else:
-        test.write_status(r, 'good')
 
 
 def setup_test(name):
@@ -574,7 +573,7 @@ def cmd_run(parser, options):
                 prepare_revision(r)
 
             try:
-                test_and_record(r)
+                test.run_and_record(r)
             except UserTestError as e:
                 # This commit has failed the test.
                 if options.keep_going:
