@@ -305,6 +305,18 @@ class Test(object):
 
         return status
 
+    def write_status(self, revision, value):
+        cmd = [
+            'git', 'notes', '--ref=%s' % (self.notes_ref,),
+            'add', '-f', '%s^{tree}' % (revision,), '-m', value,
+            ]
+        try:
+            check_call(cmd)
+        except CalledProcessError:
+            raise Fatal('fatal: error adding note to %s^{tree}' % (revision,))
+        else:
+            sys.stderr.write('Marked tree %s^{tree} to be %s\n' % (revision, value))
+
     @property
     def command(self):
         if self._command is None:
@@ -326,22 +338,6 @@ class Test(object):
 
 
 notes_ref = None
-
-def write_note(r, value):
-    if notes_ref is None:
-        return
-
-    cmd = [
-        'git', 'notes', '--ref=%s' % (notes_ref,),
-        'add', '-f', '%s^{tree}' % (r,), '-m', value,
-        ]
-    try:
-        check_call(cmd)
-    except CalledProcessError:
-        raise Fatal('fatal: error adding note to %s^{tree}' % (r,))
-    else:
-        sys.stderr.write('Marked tree %s^{tree} to be %s\n' % (r, value))
-
 
 def forget_notes(revisions):
     """Forget the notes on the specified revisions (if any)."""
@@ -396,10 +392,10 @@ def test_and_record(r):
         sys.stdout.write(FAIL_HEADER_TEMPLATE % dict(r=r))
         check_call(cmd)
         sys.stdout.write(FAIL_TRAILER_TEMPLATE % dict())
-        write_note(r, 'bad')
+        test.write_status(r, 'bad')
         raise
     else:
-        write_note(r, 'good')
+        test.write_status(r, 'good')
 
 
 def setup_test(name):
