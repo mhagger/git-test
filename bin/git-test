@@ -421,14 +421,16 @@ not what you want, please re-run this command with the '--forget' option.
 
 
 def cmd_add(parser, options):
-    cmd = ['git', 'config', 'test.%s.command' % (options.test,), options.command]
+    test = Test(options.test)
+
+    cmd = ['git', 'config', 'test.%s.command' % (test.name,), options.command]
     check_call(cmd)
 
     if options.forget:
         initialize = True
     else:
         try:
-            old_tree = rev_parse('refs/notes/tests/%s^{tree}' % (options.test,))
+            old_tree = rev_parse('%s^{tree}' % (test.full_ref,))
         except RevParseError:
             initialize = True
         else:
@@ -440,10 +442,10 @@ def cmd_add(parser, options):
                 # results and the user didn't explicitly ask for
                 # `--keep`; emit a warning in case the user forgot to
                 # `--forget`:
-                sys.stderr.write(REUSE_RESULTS_WARNING % dict(name=options.test))
+                sys.stderr.write(REUSE_RESULTS_WARNING % dict(name=test.name))
 
     if initialize:
-        initialize_notes(options.test, 'Test results initialized by \'git test add\'')
+        initialize_notes(test.name, 'Test results initialized by \'git test add\'')
 
 
 def uniqify(l):
