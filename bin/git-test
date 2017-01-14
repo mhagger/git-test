@@ -368,6 +368,12 @@ class Test(object):
                 raise Fatal('fatal: test %s is not defined!' % (self.name,))
         return self._command
 
+    @command.setter
+    def command(self, value):
+        cmd = ['git', 'config', 'test.%s.command' % (self.name,), value]
+        check_call(cmd)
+        self._command = value
+
     def run(self):
         """Run this test against the current contents of the working tree."""
 
@@ -422,8 +428,7 @@ not what you want, please re-run this command with the '--forget' option.
 def cmd_add(parser, options):
     test = Test(options.test)
 
-    cmd = ['git', 'config', 'test.%s.command' % (test.name,), options.command]
-    check_call(cmd)
+    test.command = options.command
 
     if options.forget:
         initialize = True
