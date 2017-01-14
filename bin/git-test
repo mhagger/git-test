@@ -394,14 +394,6 @@ def prepare_revision(r):
         raise Fatal('fatal: error displaying log for commit %s' % (r,))
 
 
-def setup_test(name):
-    global test
-
-    test = Test(name)
-
-    sys.stdout.write('Using test %s; command: %s\n' % (name, test.command))
-
-
 def initialize_notes(name, msg):
     cmd = ['git', 'commit-tree', '-m', msg, get_empty_tree()]
     commit = check_output(cmd).rstrip()
@@ -467,7 +459,9 @@ def uniqify(l):
 
 
 def cmd_run(parser, options):
-    setup_test(options.test)
+    test = Test(options.test)
+
+    sys.stderr.write('Using test %s; command: %s\n' % (test.name, test.command))
 
     try:
         require_clean_work_tree('test-run')
