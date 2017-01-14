@@ -317,6 +317,23 @@ class Test(object):
         else:
             sys.stderr.write('Marked tree %s^{tree} to be %s\n' % (revision, value))
 
+    def forget_status(self, revisions):
+        """Forget the stored results (if any) for the specified revisions."""
+
+        cmd = [
+            'git', 'notes', '--ref=%s' % (self.notes_ref,),
+            'remove', '--ignore-missing', '--stdin',
+            ]
+
+        try:
+            process = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+            process.communicate(''.join('%s^{tree}\n' % (r,) for r in revisions))
+            retcode = process.poll()
+            if retcode:
+                raise Fatal('fatal: error removing one or more existing notes')
+        except CalledProcessError:
+            raise Fatal('fatal: error removing one or more existing notes')
+
     @property
     def command(self):
         if self._command is None:
@@ -338,23 +355,6 @@ class Test(object):
 
 
 notes_ref = None
-
-def forget_notes(revisions):
-    """Forget the notes on the specified revisions (if any)."""
-
-    cmd = [
-        'git', 'notes', '--ref=%s' % (notes_ref,),
-        'remove', '--ignore-missing', '--stdin',
-        ]
-
-    try:
-        process = subprocess.Popen(cmd, stdin=subprocess.PIPE)
-        process.communicate(''.join('%s^{tree}\n' % (r,) for r in revisions))
-        retcode = process.poll()
-        if retcode:
-            raise Fatal('fatal: error removing one or more existing notes')
-    except CalledProcessError:
-        raise Fatal('fatal: error removing one or more existing notes')
 
 
 def prepare_revision(r):
@@ -539,7 +539,7 @@ def cmd_run(parser, options):
         head = check_output(cmd).rstrip()
 
     if options.force or options.forget:
-        forget_notes(revisions)
+        test.forget_status(revisions)
 
         if options.forget:
             return
