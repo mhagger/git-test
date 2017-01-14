@@ -405,6 +405,11 @@ class Test(object):
             ]
         check_call(cmd)
 
+    def remove(self, msg):
+        cmd = ['git', 'config', '--remove-section', 'test.%s' % (self.name,)]
+        check_call(cmd)
+        self.remove_status(msg)
+
 
 def prepare_revision(r):
     cmd = ['git', 'checkout', r]
@@ -623,9 +628,7 @@ def cmd_forget_results(parser, options):
 def cmd_remove(parser, options):
     test = Test(options.test)
 
-    cmd = ['git', 'config', '--remove-section', 'test.%s' % (test.name,)]
-    check_call(cmd)
-    test.remove_status('Test results deleted by \'git test remove\'')
+    test.remove('Test results deleted by \'git test remove\'')
 
 
 def cmd_help(parser, options, subparsers):
