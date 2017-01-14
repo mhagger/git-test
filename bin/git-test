@@ -58,6 +58,7 @@ It will only test commits with trees that it hasn't been seen before.
 
 import locale
 import sys
+import os
 import re
 import subprocess
 import argparse
@@ -267,7 +268,7 @@ def read_status(r, rs):
 
     cmd = ['git', 'notes', '--ref=%s' % (notes_ref,), 'show', '%s^{tree}' % (r,)]
     try:
-        status = check_output(cmd, stderr=open('/dev/null', 'wb')).rstrip()
+        status = check_output(cmd, stderr=open(os.devnull, 'wb')).rstrip()
     except CalledProcessError:
         return 'unknown'
 
@@ -457,7 +458,7 @@ def cmd_run(parser, options):
 
     try:
         cmd = ['git', 'symbolic-ref', 'HEAD']
-        head = check_output(cmd, stderr=open('/dev/null', 'wb')).rstrip()
+        head = check_output(cmd, stderr=open(os.devnull, 'wb')).rstrip()
     except CalledProcessError:
         cmd = ['git', 'rev-parse', 'HEAD']
         head = check_output(cmd).rstrip()
