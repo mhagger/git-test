@@ -401,13 +401,12 @@ def test_and_record(r):
 
 
 def setup_test(name):
-    global test, notes_ref, command
+    global test, notes_ref
 
     test = Test(name)
     notes_ref = test.notes_ref
-    command = test.command
 
-    sys.stdout.write('Using test %s; command: %s\n' % (name, command))
+    sys.stdout.write('Using test %s; command: %s\n' % (name, test.command))
 
 
 def initialize_notes(name, msg):
