@@ -280,6 +280,33 @@ def require_clean_work_tree(action):
         raise UncleanWorkTreeError('\n'.join(error))
 
 
+class Test(object):
+    def __init__(self, name):
+        self.name = name
+        self.notes_ref = 'tests/%s' % (self.name,)
+        self.full_ref = 'refs/notes/tests/%s' % (self.name,)
+        self._command = None
+
+    @property
+    def command(self):
+        if self._command is None:
+            cmd = ['git', 'config', '--get', 'test.%s.command' % (self.name,)]
+            try:
+                self._command = check_output(cmd).rstrip()
+            except CalledProcessError:
+                raise Fatal('fatal: test %s is not defined!' % (self.name,))
+        return self._command
+
+    def run(self):
+        """Run this test against the current contents of the working tree."""
+
+        cmd = ['sh', '-c', self.command]
+        try:
+            check_call(cmd)
+        except CalledProcessError as e:
+            raise UserTestError(e.returncode, e.cmd, e.output)
+
+
 notes_ref = None
 
 def read_status(r, rs):
@@ -332,19 +359,6 @@ def forget_notes(revisions):
         raise Fatal('fatal: error removing one or more existing notes')
 
 
-def test():
-    """Test the current contents of the working tree."""
-
-    if command is None:
-        raise Fatal('fatal: no test command configured')
-
-    cmd = ['sh', '-c', command]
-    try:
-        check_call(cmd)
-    except CalledProcessError as e:
-        raise UserTestError(e.returncode, e.cmd, e.output)
-
-
 def prepare_revision(r):
     cmd = ['git', 'checkout', r]
     try:
@@ -374,7 +388,7 @@ FAILURE!
 
 def test_and_record(r):
     try:
-        test()
+        test.run()
     except UserTestError as e:
         cmd = ['git', '--no-pager', 'log', '-1', '--decorate', r]
         sys.stdout.write(FAIL_HEADER_TEMPLATE % dict(r=r))
@@ -387,14 +401,11 @@ def test_and_record(r):
 
 
 def setup_test(name):
-    global notes_ref, command
+    global test, notes_ref, command
 
-    notes_ref = 'tests/%s' % (name,)
-    cmd = ['git', 'config', '--get', 'test.%s.command' % (name,)]
-    try:
-        command = check_output(cmd).rstrip()
-    except CalledProcessError:
-        raise Fatal('fatal: test %s is not defined!' % (name,))
+    test = Test(name)
+    notes_ref = test.notes_ref
+    command = test.command
 
     sys.stdout.write('Using test %s; command: %s\n' % (name, command))
 
@@ -475,7 +486,7 @@ def cmd_run(parser, options):
             raise
 
         try:
-            test()
+            test.run()
         except UserTestError as e:
             sys.stdout.write('\n!!! TEST FAILED !!!\n')
             sys.exit(e.returncode)
