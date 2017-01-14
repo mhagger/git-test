@@ -388,12 +388,14 @@ class Test(object):
             self.run()
         except UserTestError as e:
             cmd = ['git', '--no-pager', 'log', '-1', '--decorate', revision]
+            sys.stdout.write('%s^{tree} bad\n' % (revision,))
             sys.stderr.write(FAIL_HEADER_TEMPLATE % dict(revision=revision))
             check_call(cmd, stdout=sys.stderr)
             sys.stderr.write(FAIL_TRAILER_TEMPLATE % dict())
             self.write_status(revision, 'bad')
             raise
         else:
+            sys.stdout.write('%s^{tree} good\n' % (revision,))
             self.write_status(revision, 'good')
 
     def remove_status(self, msg):
@@ -487,9 +489,11 @@ def cmd_run(parser, options):
         try:
             test.run()
         except UserTestError as e:
+            sys.stdout.write('working-tree bad\n')
             sys.stderr.write('\n!!! TEST FAILED !!!\n')
             sys.exit(e.returncode)
         else:
+            sys.stdout.write('working-tree good\n')
             sys.stderr.write('\nTEST SUCCESSFUL\n')
         finally:
             sys.stderr.write(
@@ -555,18 +559,19 @@ def cmd_run(parser, options):
         status = test.read_status(r, rs)
 
         if status == 'good':
+            sys.stdout.write('%s^{tree} known-good\n' % (r,))
             sys.stderr.write('Tree %s^{tree} is already known to be good.\n' % (rs,))
-            continue
 
-        if status == 'bad':
+        elif status == 'bad':
             if options.retest:
                 sys.stderr.write(
                     'Tree %s^{tree} was previously tested to be bad; retesting...\n'
                     % (rs,)
                     )
-                status = 'unknown'
+                status = None
                 # fall through
             else:
+                sys.stdout.write('%s^{tree} known-bad\n' % (r,))
                 sys.stderr.write('Tree %s^{tree} is already known to be bad!\n' % (rs,))
                 status = 'failed'
                 if options.keep_going:
@@ -574,7 +579,10 @@ def cmd_run(parser, options):
                 else:
                     sys.exit(1)
 
-        if status == 'unknown':
+        elif status == 'unknown':
+            status = None
+
+        if status is None:
             if not testing_head:
                 prepare_revision(r)
 
