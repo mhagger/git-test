@@ -599,18 +599,20 @@ def cmd_run(parser, options):
 
 
 def cmd_forget_results(parser, options):
-    cmd = ['git', 'config', 'test.%s.command' % (options.test,)]
+    test = Test(options.test)
+
+    cmd = ['git', 'config', 'test.%s.command' % (test.name,)]
     try:
         check_call(cmd, stdout=open(os.devnull, 'wb'))
         test_defined = True
     except CalledProcessError:
         # There is no test defined; simply delete the notes reference:
         remove_notes(
-            options.test, 'Test results deleted by \'git test forget-results\''
+            test.name, 'Test results deleted by \'git test forget-results\''
             )
     else:
         initialize_notes(
-            options.test, 'Test results reinitialized by \'git test forget-results\''
+            test.name, 'Test results reinitialized by \'git test forget-results\''
             )
 
 
