@@ -50,6 +50,8 @@ or test an arbitrary set of commits supplied via standard input:
 
     git rev-list feature1 feature2 ^master | git test run --stdin
 
+You can adjust the verbosity of the output using the `--verbosity`/`-v` or `--quiet`/`-q` options. Both of these options can be specified multiple times.
+
 ### Define multiple tests
 
 You can define multiple tests in a single repository (e.g., cheap vs. expensive tests). Their results are kept separate. By default, the test called `default` is run, but you can specify a different test to add/run using the `--test=<name>`/`-t <name>` option:

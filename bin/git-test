@@ -168,6 +168,38 @@ def check_output(*popenargs, **kwargs):
         raise CalledProcessError(e.returncode, e.cmd, _decode_output(e.output))
 
 
+def chatty_call(*popenargs, **kwargs):
+    """Run a program like `check_call()`, but with variable verbosity.
+
+    Compare the current global `verbosity` with the keyword argument `level`:
+
+    * If verbosity < level - 1, then never show the command's output.
+    * If verbosity == level - 1, then show the output only if there is an error.
+    * If verbosity >= level, then show the output in any case.
+
+    The default level is 1 (i.e., at the default verbosity level, show
+    the output only in the case of an error).
+
+    The caller should not set keyword arguments `stdout` or `stderr`.
+
+    """
+
+    level = kwargs.pop('level', 1)
+    kwargs['stderr'] = subprocess.STDOUT
+    if verbosity < level - 1:
+        kwargs['stdout'] = open(os.devnull, 'wb')
+        check_call(*popenargs, **kwargs)
+    elif verbosity == level - 1:
+        try:
+            check_output(*popenargs, **kwargs)
+        except CalledProcessError as e:
+            sys.stderr.write(e.output)
+            raise
+    else:
+        kwargs['stdout'] = sys.stderr
+        check_call(*popenargs, **kwargs)
+
+
 class RevParseError(Fatal):
     pass
 
@@ -235,7 +267,7 @@ def unstaged_changes():
     """Return True iff there are unstaged changes in the working copy"""
 
     try:
-        check_call(['git', 'diff-files', '--quiet', '--ignore-submodules'])
+        chatty_call(['git', 'diff-files', '--quiet', '--ignore-submodules'])
         return False
     except CalledProcessError:
         return True
@@ -245,7 +277,7 @@ def uncommitted_changes():
     """Return True iff the index contains uncommitted changes."""
 
     try:
-        check_call([
+        chatty_call([
             'git', 'diff-index', '--cached', '--quiet',
             '--ignore-submodules', 'HEAD', '--',
             ])
@@ -314,7 +346,7 @@ class Test(object):
             '-m', 'test: %s' % (msg,),
             self.full_ref, commit,
             ]
-        check_call(cmd)
+        chatty_call(cmd)
 
     def read_status(self, revision, revision_short):
         cmd = [
@@ -340,11 +372,12 @@ class Test(object):
             'add', '-f', '%s^{tree}' % (revision,), '-m', value,
             ]
         try:
-            check_call(cmd)
+            chatty_call(cmd)
         except CalledProcessError:
             raise Fatal('fatal: error adding note to %s^{tree}' % (revision,))
         else:
-            sys.stderr.write('Marked tree %s^{tree} to be %s\n' % (revision, value))
+            if verbosity >= 0:
+                sys.stderr.write('Marked tree %s^{tree} to be %s\n' % (revision, value))
 
     def forget_status(self, revisions):
         """Forget the stored results (if any) for the specified revisions."""
@@ -354,11 +387,21 @@ class Test(object):
             'remove', '--ignore-missing', '--stdin',
             ]
 
+        level = 1
+        kwargs = dict(stdin=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+        if verbosity < level - 1:
+            kwargs['stdout'] = open(os.devnull, 'wb')
+        elif verbosity == level - 1:
+            kwargs['stdout'] = subprocess.PIPE
+
         try:
-            process = subprocess.Popen(cmd, stdin=subprocess.PIPE)
-            communicate(process, ''.join('%s^{tree}\n' % (r,) for r in revisions))
+            process = subprocess.Popen(cmd, **kwargs)
+            out, err = communicate(process, ''.join('%s^{tree}\n' % (r,) for r in revisions))
             retcode = process.poll()
             if retcode:
+                if verbosity == level - 1:
+                    sys.stderr.write(out)
                 raise Fatal('fatal: error removing one or more existing notes')
         except CalledProcessError:
             raise Fatal('fatal: error removing one or more existing notes')
@@ -376,7 +419,7 @@ class Test(object):
     @command.setter
     def command(self, value):
         cmd = ['git', 'config', 'test.%s.command' % (self.name,), value]
-        check_call(cmd)
+        chatty_call(cmd)
         self._command = value
 
     def run(self):
@@ -384,7 +427,7 @@ class Test(object):
 
         cmd = ['sh', '-c', self.command]
         try:
-            check_call(cmd, stdout=sys.stderr)
+            chatty_call(cmd, level=0)
         except CalledProcessError as e:
             raise UserTestError(e.returncode, e.cmd, e.output)
 
@@ -392,12 +435,13 @@ class Test(object):
         try:
             self.run()
         except UserTestError as e:
-            cmd = ['git', '--no-pager', 'log', '-1', '--decorate', revision]
             sys.stdout.write('%s^{tree} bad\n' % (revision,))
-            sys.stderr.write(FAIL_HEADER_TEMPLATE % dict(revision=revision))
-            check_call(cmd, stdout=sys.stderr)
-            sys.stderr.write(FAIL_TRAILER_TEMPLATE % dict())
-            self.write_status(revision, 'bad')
+            if verbosity >= -1:
+                sys.stderr.write(FAIL_HEADER_TEMPLATE % dict(revision=revision))
+                cmd = ['git', '--no-pager', 'log', '-1', '--decorate', revision]
+                chatty_call(cmd, level=-1)
+                sys.stderr.write(FAIL_TRAILER_TEMPLATE % dict())
+                self.write_status(revision, 'bad')
             raise
         else:
             sys.stdout.write('%s^{tree} good\n' % (revision,))
@@ -410,26 +454,31 @@ class Test(object):
             'git', 'update-ref', '-d', 'refs/notes/tests/%s' % (self.name,),
             '-m', msg,
             ]
-        check_call(cmd)
+        chatty_call(cmd)
 
     def remove(self, msg):
         cmd = ['git', 'config', '--remove-section', 'test.%s' % (self.name,)]
-        check_call(cmd)
+        chatty_call(cmd)
         self.remove_status(msg)
 
 
 def prepare_revision(r):
-    cmd = ['git', 'checkout', r]
     try:
-        check_output(cmd, stderr=subprocess.STDOUT)
+        cmd = ['git', 'checkout', r]
+        chatty_call(cmd)
     except CalledProcessError as e:
         raise Fatal('fatal: error checking out commit %s:\n%s' % (r, e.output,))
 
-    cmd = ['git', '--no-pager', 'log', '-1', '--decorate', r]
-    try:
-        check_call(cmd, stdout=sys.stderr)
-    except CalledProcessError as e:
-        raise Fatal('fatal: error displaying log for commit %s' % (r,))
+    if verbosity >= -1:
+        cmd = ['git', '--no-pager', 'log', '-1', '--decorate', r]
+        try:
+            if verbosity >= 0:
+                sys.stderr.write('\n')
+            chatty_call(cmd, level=0)
+            if verbosity >= 0:
+                sys.stderr.write('\n')
+        except CalledProcessError as e:
+            raise Fatal('fatal: error displaying log for commit %s' % (r,))
 
 
 REUSE_RESULTS_WARNING = """\
@@ -481,7 +530,8 @@ def uniqify(l):
 def cmd_run(parser, options):
     test = Test(options.test)
 
-    sys.stderr.write('Using test %s; command: %s\n' % (test.name, test.command))
+    if verbosity >= 0:
+        sys.stderr.write('Using test %s; command: %s\n' % (test.name, test.command))
 
     try:
         require_clean_work_tree('test-run')
@@ -495,11 +545,13 @@ def cmd_run(parser, options):
             test.run()
         except UserTestError as e:
             sys.stdout.write('working-tree bad\n')
-            sys.stderr.write('\n!!! TEST FAILED !!!\n')
+            if verbosity >= -1:
+                sys.stderr.write('\n!!! TEST FAILED !!!\n')
             sys.exit(e.returncode)
         else:
             sys.stdout.write('working-tree good\n')
-            sys.stderr.write('\nTEST SUCCESSFUL\n')
+            if verbosity >= -1:
+                sys.stderr.write('\nTEST SUCCESSFUL\n')
         finally:
             sys.stderr.write(
                 'Note: working tree is dirty; results will not be saved.\n'
@@ -608,28 +660,33 @@ def cmd_run(parser, options):
 
     if not testing_head:
         cmd = ['git', 'checkout', '-f', re.sub(r'^refs/heads/', '', head)]
-        check_call(cmd, stdout=sys.stderr)
+        chatty_call(cmd)
 
-    sys.stderr.write('\n')
     if fail_count > 0:
-        if fail_count == 1:
-            sys.stderr.write('!!! %s TEST FAILED !!!\n' % (fail_count,))
-        else:
-            sys.stderr.write('!!! %s TESTS FAILED !!!\n' % (fail_count,))
+        if verbosity >= -1:
+            sys.stderr.write('\n')
+            if fail_count == 1:
+                sys.stderr.write('!!! %s TEST FAILED !!!\n' % (fail_count,))
+            else:
+                sys.stderr.write('!!! %s TESTS FAILED !!!\n' % (fail_count,))
 
         if last_failure is not None:
             sys.exit(last_failure)
         else:
             sys.exit(1)
     elif unknown_count > 0:
-        if unknown_count == 1:
-            sys.stderr.write('%s TEST UNKNOWN\n' % (unknown_count,))
-        else:
-            sys.stderr.write('%s TESTS UNKNOWN\n' % (unknown_count,))
+        if verbosity >= -1:
+            sys.stderr.write('\n')
+            if unknown_count == 1:
+                sys.stderr.write('%s TEST UNKNOWN\n' % (unknown_count,))
+            else:
+                sys.stderr.write('%s TESTS UNKNOWN\n' % (unknown_count,))
 
         sys.exit(2)
     else:
-        sys.stderr.write('ALL TESTS SUCCESSFUL\n')
+        if verbosity >= -1:
+            sys.stderr.write('\n')
+            sys.stderr.write('ALL TESTS SUCCESSFUL\n')
         return
 
 
@@ -638,7 +695,7 @@ def cmd_forget_results(parser, options):
 
     cmd = ['git', 'config', 'test.%s.command' % (test.name,)]
     try:
-        check_call(cmd, stdout=open(os.devnull, 'wb'))
+        chatty_call(cmd)
         test_defined = True
     except CalledProcessError:
         # There is no test defined; simply delete the notes reference:
@@ -845,6 +902,10 @@ def main(args):
     options = parser.parse_args(args)
 
     verbosity = options.verbose - options.quiet
+
+    # Expose the verbosity to child processes, in case they want to
+    # adjust their output levels, too:
+    os.environ['GIT_TEST_VERBOSITY'] = str(verbosity)
 
     if options.subcommand == 'add':
         cmd_add(parser, options)
