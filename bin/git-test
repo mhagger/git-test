@@ -88,10 +88,10 @@ except ImportError:
             return "Command '%s' returned non-zero exit status %d" % (self.cmd, self.returncode)
 
 try:
-    from subprocess import check_output
+    from subprocess import check_output as _check_output
 except ImportError:
     # Use definition from Python 2.7 subprocess module:
-    def check_output(*popenargs, **kwargs):
+    def _check_output(*popenargs, **kwargs):
         if 'stdout' in kwargs:
             raise ValueError('stdout argument not allowed, it will be overridden.')
         process = subprocess.Popen(stdout=subprocess.PIPE, *popenargs, **kwargs)
@@ -159,8 +159,11 @@ def _decode_output(value):
     return value.decode(sys.getfilesystemencoding(), 'surrogateescape')
 
 
-def check_git_output(*popenargs, **kwargs):
-    return _decode_output(check_output(*popenargs, **kwargs))
+def check_output(*popenargs, **kwargs):
+    try:
+        return _decode_output(_check_output(*popenargs, **kwargs))
+    except CalledProcessError as e:
+        raise CalledProcessError(e.returncode, e.cmd, _decode_output(e.output))
 
 
 class RevParseError(Fatal):
@@ -174,7 +177,7 @@ def rev_parse(arg, abbrev=None):
         cmd = ['git', 'rev-parse', '--verify', '-q', arg]
 
     try:
-        return check_git_output(cmd).strip()
+        return check_output(cmd).strip()
     except CalledProcessError:
         raise RevParseError('%r is not a valid commit!' % (arg,))
 
@@ -351,7 +354,7 @@ class Test(object):
 
         try:
             process = subprocess.Popen(cmd, stdin=subprocess.PIPE)
-            process.communicate(''.join('%s^{tree}\n' % (r,) for r in revisions))
+            communicate(process, ''.join('%s^{tree}\n' % (r,) for r in revisions))
             retcode = process.poll()
             if retcode:
                 raise Fatal('fatal: error removing one or more existing notes')
