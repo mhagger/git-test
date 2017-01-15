@@ -109,6 +109,8 @@ except ImportError:
         return output
 
 
+verbosity = 0
+
 class Fatal(Exception):
     """An exception that indicates a normal failure of the script.
 
@@ -667,10 +669,33 @@ def cmd_help(parser, options, subparsers):
 
 
 def main(args):
+    global verbosity
+
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
         )
+
+    def add_verbosity_options(parser, help=False):
+        if help:
+            verbose_help = 'generate more verbose output (may be specified multiple times)'
+            quiet_help = 'generate less verbose output (may be specified multiple times)'
+        else:
+            verbose_help = quiet_help = argparse.SUPPRESS
+
+        parser.add_argument(
+            '--verbose', '-v',
+            action='count', default=0,
+            help=verbose_help,
+            )
+        parser.add_argument(
+            '--quiet', '-q',
+            action='count', default=0,
+            help=quiet_help,
+            )
+
+    add_verbosity_options(parser, help=True)
+
     subparsers = parser.add_subparsers(
         dest='subcommand', help='sub-command',
         parser_class=argparse.ArgumentParser,
@@ -702,6 +727,7 @@ def main(args):
         'command',
         help='command to run',
         )
+    add_verbosity_options(subparser)
 
     def add_run_arguments(subparser):
         subparser.add_argument(
@@ -760,6 +786,7 @@ def main(args):
         help='run a test against one or more commits',
         )
     add_run_arguments(subparser)
+    add_verbosity_options(subparser)
 
     # This command is no longer supported, but emit a help message if
     # it is requested:
@@ -771,6 +798,7 @@ def main(args):
     # argparse will emit an error about unrecognized arguments and
     # abort before we get a chance to emit our help message:
     add_run_arguments(subparser)
+    add_verbosity_options(subparser)
 
     subparser = subparsers.add_parser(
         'forget-results',
@@ -784,6 +812,7 @@ def main(args):
         action='store', default='default',
         help='name of test whose results should be forgotten (default is \'default\')',
         )
+    add_verbosity_options(subparser)
 
     subparser = subparsers.add_parser(
         'remove',
@@ -797,6 +826,7 @@ def main(args):
         action='store', default='default',
         help='name of test to remove (default is \'default\')',
         )
+    add_verbosity_options(subparser)
 
     subparser = subparsers.add_parser(
         'help',
@@ -810,8 +840,11 @@ def main(args):
         'cmd', nargs='?', default=None,
         help='subcommand that you want help for (optional)',
         )
+    add_verbosity_options(subparser)
 
     options = parser.parse_args(args)
+
+    verbosity = options.verbose - options.quiet
 
     if options.subcommand == 'add':
         cmd_add(parser, options)
