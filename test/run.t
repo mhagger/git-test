@@ -398,6 +398,14 @@ test_expect_success 'default (retcodes): force test range' '
 	test_cmp expected numbers.log
 '
 
+test_expect_success 'default (retcodes): list results' '
+	rm -f numbers.log &&
+	gen_stdout c2 unknown c3 unknown c4 known-good c5 known-bad c6 unknown c7 unknown c8 unknown >expected-stdout &&
+	git-test results c1..c8 >actual-stdout &&
+	test_cmp expected-stdout actual-stdout &&
+	test_must_fail test -f numbers.log
+'
+
 test_expect_success 'default (retcodes): keep-going: retcode wins if last' '
 	rm -f numbers.log &&
 	gen_stdout c2 good c3 bad c4 good c5 bad c6 good >expected-stdout &&

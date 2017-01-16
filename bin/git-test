@@ -360,7 +360,7 @@ class Test(object):
             ]
         chatty_call(cmd)
 
-    def read_status(self, revision, revision_short):
+    def read_status(self, revision, revision_short=None):
         cmd = [
             'git', 'notes', '--ref=%s' % (self.notes_ref,),
             'show', '%s^{tree}' % (revision,),
@@ -373,7 +373,7 @@ class Test(object):
         if status not in ['good', 'bad']:
             raise Fatal(
                 'fatal: unrecognized status %r for tree %s^{tree}!'
-                % (status, revision_short),
+                % (status, revision_short or revision),
                 )
 
         return status
@@ -695,6 +695,27 @@ def cmd_run(parser, options):
         return
 
 
+def cmd_results(parser, options):
+    test = Test(options.test)
+
+    revisions = list(uniqify(iter_commits(parser, options)))
+
+    if not revisions:
+        sys.stderr.write('NO COMMITS SPECIFIED! (so none failed)\n')
+        return
+    elif revisions == ['HEAD']:
+        revisions = [rev_parse('HEAD')]
+
+    for r in revisions:
+        status = test.read_status(r)
+        if status == 'good':
+            sys.stdout.write('%s^{tree} known-good\n' % (r,))
+        elif status == 'bad':
+            sys.stdout.write('%s^{tree} known-bad\n' % (r,))
+        elif status == 'unknown':
+            sys.stdout.write('%s^{tree} unknown\n' % (r,))
+
+
 def cmd_forget_results(parser, options):
     test = Test(options.test)
 
@@ -863,6 +884,30 @@ def main(args):
     add_verbosity_options(subparser)
 
     subparser = subparsers.add_parser(
+        'results',
+        description=(
+            'Show any stored results for the specified commits.'
+            ),
+        help='show any stored test results for the specified commits',
+        )
+    subparser.add_argument(
+        '--test', '-t', metavar='name',
+        action='store', default='default',
+        help='name of test (default is \'default\')',
+        )
+    subparser.add_argument(
+        '--stdin', action='store_true',
+        help=(
+            'read the list of commits from standard input, one per line'
+            ),
+        )
+    subparser.add_argument(
+        'commits', nargs='*',
+        help='commits or ranges of commits',
+        )
+    add_verbosity_options(subparser)
+
+    subparser = subparsers.add_parser(
         'forget-results',
         description=(
             'Forget all stored test results for a test.'
@@ -918,6 +963,8 @@ def main(args):
         cmd_run(parser, options)
     elif options.subcommand == 'range':
         parser.error('the \'range\' subcommand has been renamed to \'run\'.')
+    elif options.subcommand == 'results':
+        cmd_results(parser, options)
     elif options.subcommand == 'forget-results':
         cmd_forget_results(parser, options)
     elif options.subcommand == 'remove':
