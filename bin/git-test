@@ -527,6 +527,36 @@ def cmd_add(parser, options):
         test.initialize_status('Test results initialized by \'git test add\'')
 
 
+def iter_commits(parser, options):
+    """Iterate over the commits specified by the user.
+
+    Yield the special value 'HEAD' if the current checked-out version
+    should be tested."""
+
+    revisions = []
+
+    if (not options.commits or options.commits == ['HEAD']) and not options.stdin:
+        yield 'HEAD'
+        return
+
+    for arg in options.commits:
+        limits = arg.split('..')
+        if len(limits) == 1:
+            yield rev_parse('%s^{commit}' % (arg,))
+        elif len(limits) == 2:
+            for revision in rev_list('--reverse', arg):
+                yield revision
+        else:
+            parser.error(
+                'commit arguments must be single commits '
+                'or of the form \'A..B\''
+                )
+
+    if options.stdin:
+        for arg in sys.stdin:
+            yield rev_parse('%s^{commit}' % (arg.strip(),))
+
+
 def cmd_run(parser, options):
     test = Test(options.test)
 
@@ -558,41 +588,16 @@ def cmd_run(parser, options):
                 )
         return
 
-    revisions = []
-
-    if options.stdin:
-        testing_head = False
-    elif not options.commits:
-        revisions.append(rev_parse('HEAD'))
-        testing_head = True
-    elif options.commits == ['HEAD']:
-        testing_head = True
-    else:
-        testing_head = False
-
-    for arg in options.commits:
-        limits = arg.split('..')
-        if len(limits) == 1:
-            revisions.append(rev_parse('%s^{commit}' % (arg,)))
-        elif len(limits) == 2:
-            revisions.extend(rev_list('--reverse', arg))
-        else:
-            parser.error(
-                'commit arguments must be single commits '
-                'or of the form \'A..B\''
-                )
-
-    if options.stdin:
-        revisions.extend(
-            rev_parse('%s^{commit}' % (arg.strip(),))
-            for arg in sys.stdin
-            )
-
-    revisions = list(uniqify(revisions))
+    revisions = list(uniqify(iter_commits(parser, options)))
 
     if not revisions:
         sys.stderr.write('NO COMMITS SPECIFIED! (so none failed)\n')
         return
+    elif revisions == ['HEAD']:
+        testing_head = True
+        revisions = [rev_parse('HEAD')]
+    else:
+        testing_head = False
 
     try:
         cmd = ['git', 'symbolic-ref', 'HEAD']
