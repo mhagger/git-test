@@ -236,6 +236,18 @@ def rev_list(*args):
         raise Fatal('git rev-list %s failed' % (' '.join(args),))
 
 
+def uniqify(l):
+    """Iterate over the unique items in l, in the original order.
+
+    Yield an item only the first time it is seen."""
+
+    seen = set()
+    for i in l:
+        if i not in seen:
+            yield i
+            seen.add(i)
+
+
 _empty_tree = None
 
 def get_empty_tree():
@@ -513,18 +525,6 @@ def cmd_add(parser, options):
 
     if initialize:
         test.initialize_status('Test results initialized by \'git test add\'')
-
-
-def uniqify(l):
-    """Iterate over the unique items in l, in the original order.
-
-    Yield an item only the first time it is seen."""
-
-    seen = set()
-    for i in l:
-        if i not in seen:
-            yield i
-            seen.add(i)
 
 
 def cmd_run(parser, options):
