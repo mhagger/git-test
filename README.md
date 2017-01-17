@@ -114,9 +114,9 @@ Because linked worktrees share branches and the git configuration with the main 
 Requirements:
 
 * A recent Git command-line client
-* A Python2 interpreter
+* A Python interpreter. `git test` has been tested with Python versions 2.7 and 3.4. It will probably work with any Python3 version starting with 3.2 (it requires `argparse`).
 
-Just put `bin/git-test` somewhere in your `$PATH`, adjusting its first line if necessary to invoke a Python2 interpreter properly in your environment.
+Just put `bin/git-test` somewhere in your `$PATH`, adjusting its first line if necessary to invoke the desired Python interpreter properly in your environment.
 
 
 ## Ideas for future enhancements
