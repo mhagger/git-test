@@ -6,7 +6,7 @@ The best way to use `git test` is to keep a window open in a second linked workt
 
     git test run master..mybranch
 
-`git test` will test the commits in that range, reporting any failures. The pass/fail results of running tests are also recorded permanently in your repository as Git "notes" (see `git-notes(1)`).
+`git test` will test the commits in the specified range, reporting any failures. The pass/fail results of running tests are also recorded permanently in your repository as Git "notes" (see `git-notes(1)`).
 
 If a commit in the range has already been tested, then by default `git test` reports the old results rather than testing it again. This means that you can run the above command over and over as you work, and `git test` won't repeat tests whose results it already knows. (Of course there are options to allow you to request explicitly that commits be retested.)
 
@@ -50,7 +50,7 @@ or test an arbitrary set of commits supplied via standard input:
 
     git rev-list feature1 feature2 ^master | git test run --stdin
 
-You can adjust the verbosity of the output using the `--verbosity`/`-v` or `--quiet`/`-q` options. Both of these options can be specified multiple times.
+You can adjust the verbosity of the output using the `--verbosity`/`-v` or `--quiet`/`-q` options. Either of these options can be specified multiple times.
 
 ### Define multiple tests
 
@@ -73,7 +73,7 @@ If you want to permanently forget *all* stored results for a particular test (e.
 
 ### Continue on test failures
 
-Normally, `git test run` stops at the first broken commit that it finds. If you'd prefer for it to continue, use the `--keep-going`/`-k` option.
+Normally, `git test run` stops at the first broken commit that it finds. If you'd prefer for it to continue even after a failure, use the `--keep-going`/`-k` option.
 
 ### Removing tests
 
@@ -153,9 +153,18 @@ Some other features that would be nice:
 
 ## Caveats and disclaimers
 
-I've used this script for a while, but it surely still has bugs and rough edges. **Use `git test` at your own risk!**
+`git test` has pretty good automated tests, but it undoubtedly still has bugs and rough edges. Use it at your own risk.
 
-For example, `git test` currently checks out commits willy-nilly, often leaving your repository in a "detached HEAD" state. This is not harmful per se, but it can be confusing, and if you are not careful it could potentially result in loss of work that is not on a branch.
+Please note that when you tell `git test run` to test specified commits, it checks those commits out in your working directory. If the tests fail, it leaves the failing commit checked out *in a detached HEAD state*. This is intentional, so that you can examine the cause of the failure. But it means that if you had changes on your original HEAD that weren't part of any branch, they will now be unreachable.
 
-To reduce the risk, **it is recommended that you run `git test` in a separate worktree**, which is more convenient anyway (see above for instructions). Note that the `git worktree` command was added in Git release 2.5, so make sure you are using that version of Git or (preferably) newer.
+If you don't know what a detached HEAD state is, please read up on it. Additionally, **it is recommended that you run `git test` in a separate worktree**, which is more convenient anyway (see above for instructions). Note that the `git worktree` command was added in Git release 2.5, so make sure you are using that version of Git or (preferably) newer.
 
+The above considerations don't apply to running `git test` against HEAD or your current working tree. In other words,
+
+    git test run
+
+and
+
+    git test run HEAD
+
+don't change the commit that is checked out, and they won't change your working copy to a detached HEAD state.
