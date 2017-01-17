@@ -141,13 +141,9 @@ Some other features that would be nice:
 
 *   Remember return codes and give them back out if the old result is reused.
 
-*   Add a subcommand to list known results for a commit range in machine-readable format.
-
 *   Add a `git test fix <range>`, which starts an interactive rebase, changing the command for the first broken commit from "pick" to "edit".
 
 *   Support tests that depend on the *commit*, not the *tree*, that they are run against.
-
-*   Make the script compatible with Python 3.
 
 
 ## License
