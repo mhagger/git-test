@@ -63,6 +63,19 @@ import re
 import subprocess
 import argparse
 
+# https://pypi.org/project/colorama/
+from colorama import Fore, Back, Style, init
+init()
+
+def colored(text, color):
+    """Super simple version of colored from https://pypi.org/project/termcolor/
+
+    Example:
+    print('Save changes? ' + colored('Yes', Fore.GREEN) + '/' + colored('No', Fore.RED))
+    """
+    return color + text + Style.RESET_ALL
+
+
 
 if not (0x02060000 <= sys.hexversion):
     sys.stderr.write('fatal: Python version 2.6 or later is required')
