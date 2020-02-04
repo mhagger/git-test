@@ -84,7 +84,7 @@ def colored(text, color):
 
 
 if not (0x02060000 <= sys.hexversion):
-    sys.stderr.write('fatal: Python version 2.6 or later is required')
+    sys.stderr.write(colored('fatal: Python version 2.6 or later is required', Fore.RED))
     sys.exit(125)
 
 
@@ -998,7 +998,7 @@ if __name__ == '__main__':
     try:
         main(sys.argv[1:])
     except Fatal as e:
-        sys.stderr.write('\nERROR!\n%s\n\n' % (e,))
+        sys.stderr.write(colored('\nERROR!\n%s\n\n' % (e,), Fore.RED))
         sys.exit(125)
 
 
