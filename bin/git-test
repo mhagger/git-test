@@ -688,11 +688,11 @@ def cmd_run(parser, options):
 
     if fail_count > 0:
         if verbosity >= -1:
-            sys.stderr.write('\n')
             if fail_count == 1:
-                sys.stderr.write('!!! %s TEST FAILED !!!\n' % (fail_count,))
+                test_text = 'TEST'
             else:
-                sys.stderr.write('!!! %s TESTS FAILED !!!\n' % (fail_count,))
+                test_text = 'TESTS'
+            sys.stderr.write('\n!!! %s %s FAILED !!!\n' % (fail_count, test_text))
 
         if last_failure is not None:
             sys.exit(last_failure)
@@ -700,17 +700,16 @@ def cmd_run(parser, options):
             sys.exit(1)
     elif unknown_count > 0:
         if verbosity >= -1:
-            sys.stderr.write('\n')
             if unknown_count == 1:
-                sys.stderr.write('%s TEST UNKNOWN\n' % (unknown_count,))
+                test_text = 'TEST'
             else:
-                sys.stderr.write('%s TESTS UNKNOWN\n' % (unknown_count,))
+                test_text = 'TESTS'
+            sys.stderr.write('\n%s %s UNKNOWN\n' % (unknown_count, test_text))
 
         sys.exit(2)
     else:
         if verbosity >= -1:
-            sys.stderr.write('\n')
-            sys.stderr.write('ALL TESTS SUCCESSFUL\n')
+            sys.stderr.write(colored('\nALL TESTS SUCCESSFUL\n', Fore.GREEN))
         return
 
 
