@@ -65,7 +65,13 @@ import argparse
 
 # https://pypi.org/project/colorama/
 from colorama import Fore, Back, Style, init
-init()
+
+if os.environ.get('OS') != 'Windows_NT' or os.environ.get('MSYSTEM') != 'MINGW64':
+    # Skip calling init for (most likely) a "Git Bash" window from the
+    # "Git for windows" program. It handle ANSI colour codes fine, and
+    # calling init will actually result in no color.
+    # Probably related to https://github.com/tartley/colorama/issues/104.
+    init()
 
 def colored(text, color):
     """Super simple version of colored from https://pypi.org/project/termcolor/
