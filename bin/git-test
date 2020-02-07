@@ -468,10 +468,10 @@ class Test(object):
         except UserTestError as e:
             sys.stdout.write('%s^{tree} bad\n' % (revision,))
             if verbosity >= -1:
-                sys.stderr.write(FAIL_HEADER_TEMPLATE % dict(revision=revision))
+                sys.stderr.write(colored(FAIL_HEADER_TEMPLATE % dict(revision=revision), Fore.RED))
                 cmd = ['git', '--no-pager', 'log', '-1', '--decorate', revision]
                 chatty_call(cmd, level=-1)
-                sys.stderr.write(FAIL_TRAILER_TEMPLATE % dict())
+                sys.stderr.write(colored(FAIL_TRAILER_TEMPLATE % dict(), Fore.RED))
                 self.write_status(revision, 'bad')
             raise
         else:
@@ -540,7 +540,7 @@ def cmd_add(parser, options):
                 # results and the user didn't explicitly ask for
                 # `--keep`; emit a warning in case the user forgot to
                 # `--forget`:
-                sys.stderr.write(REUSE_RESULTS_WARNING % dict(name=test.name))
+                sys.stderr.write(colored(REUSE_RESULTS_WARNING % dict(name=test.name), Fore.YELLOW))
 
     if initialize:
         test.initialize_status('Test results initialized by \'git test add\'')
@@ -595,12 +595,12 @@ def cmd_run(parser, options):
         except UserTestError as e:
             sys.stdout.write('working-tree bad\n')
             if verbosity >= -1:
-                sys.stderr.write('\n!!! TEST FAILED !!!\n')
+                sys.stderr.write(colored('\n!!! TEST FAILED !!!\n', Fore.RED))
             sys.exit(e.returncode)
         else:
             sys.stdout.write('working-tree good\n')
             if verbosity >= -1:
-                sys.stderr.write('\nTEST SUCCESSFUL\n')
+                sys.stderr.write(colored('\nTEST SUCCESSFUL\n', Fore.GREEN))
         finally:
             sys.stderr.write(
                 'Note: working tree is dirty; results will not be saved.\n'
@@ -692,7 +692,7 @@ def cmd_run(parser, options):
                 test_text = 'TEST'
             else:
                 test_text = 'TESTS'
-            sys.stderr.write('\n!!! %s %s FAILED !!!\n' % (fail_count, test_text))
+            sys.stderr.write(colored('\n!!! %s %s FAILED !!!\n' % (fail_count, test_text), Fore.RED))
 
         if last_failure is not None:
             sys.exit(last_failure)
@@ -704,7 +704,7 @@ def cmd_run(parser, options):
                 test_text = 'TEST'
             else:
                 test_text = 'TESTS'
-            sys.stderr.write('\n%s %s UNKNOWN\n' % (unknown_count, test_text))
+            sys.stderr.write(colored('\n%s %s UNKNOWN\n' % (unknown_count, test_text), Fore.YELLOW))
 
         sys.exit(2)
     else:
