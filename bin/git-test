@@ -580,7 +580,7 @@ def cmd_run(parser, options):
     test = Test(options.test)
 
     if verbosity >= 0:
-        sys.stderr.write('Using test %s; command: %s\n' % (test.name, test.command))
+        sys.stderr.write('Using test %s; command: %s\n' % (colored(test.name, Fore.YELLOW), colored(test.command, Fore.YELLOW)))
 
     try:
         require_clean_work_tree('test-run')
