@@ -81,6 +81,14 @@ def colored(text, color):
     """
     return color + text + Style.RESET_ALL
 
+def good_bad_text(value):
+    if value == 'good' or value == 'known-good':
+        return colored(value, Fore.GREEN)
+    if value == 'bad' or value == 'known-bad':
+        return colored(value, Fore.RED)
+    if value == 'unknown':
+        return colored(value, Fore.YELLOW)
+    return value
 
 
 if not (0x02060000 <= sys.hexversion):
@@ -408,7 +416,7 @@ class Test(object):
             raise Fatal('fatal: error adding note to %s^{tree}' % (revision,))
         else:
             if verbosity >= 0:
-                sys.stderr.write('Marked tree %s^{tree} to be %s\n' % (revision, value))
+                sys.stderr.write('Marked tree %s^{tree} to be %s\n' % (revision, good_bad_text(value)))
 
     def forget_status(self, revisions):
         """Forget the stored results (if any) for the specified revisions."""
@@ -466,7 +474,7 @@ class Test(object):
         try:
             self.run()
         except UserTestError as e:
-            sys.stdout.write('%s^{tree} bad\n' % (revision,))
+            sys.stdout.write('%s^{tree} %s\n' % (revision, good_bad_text('bad')))
             if verbosity >= -1:
                 sys.stderr.write(colored(FAIL_HEADER_TEMPLATE % dict(revision=revision), Fore.RED))
                 cmd = ['git', '--no-pager', 'log', '-1', '--decorate', revision]
@@ -475,7 +483,7 @@ class Test(object):
                 self.write_status(revision, 'bad')
             raise
         else:
-            sys.stdout.write('%s^{tree} good\n' % (revision,))
+            sys.stdout.write('%s^{tree} %s\n' % (revision, good_bad_text('good')))
             self.write_status(revision, 'good')
 
     def remove_status(self, msg):
@@ -593,12 +601,12 @@ def cmd_run(parser, options):
         try:
             test.run()
         except UserTestError as e:
-            sys.stdout.write('working-tree bad\n')
+            sys.stdout.write('working-tree %s\n' % good_bad_text('bad'))
             if verbosity >= -1:
                 sys.stderr.write(colored('\n!!! TEST FAILED !!!\n', Fore.RED))
             sys.exit(e.returncode)
         else:
-            sys.stdout.write('working-tree good\n')
+            sys.stdout.write('working-tree %s\n' % good_bad_text('good'))
             if verbosity >= -1:
                 sys.stderr.write(colored('\nTEST SUCCESSFUL\n', Fore.GREEN))
         finally:
@@ -641,20 +649,20 @@ def cmd_run(parser, options):
         status = test.read_status(r, rs)
 
         if status == 'good':
-            sys.stdout.write('%s^{tree} known-good\n' % (r,))
-            sys.stderr.write('Tree %s^{tree} is already known to be good.\n' % (rs,))
+            sys.stdout.write('%s^{tree} %s\n' % (r, good_bad_text('known-good')))
+            sys.stderr.write('Tree %s^{tree} is already known to be %s.\n' % (rs, good_bad_text('good')))
 
         elif status == 'bad':
             if options.retest and not options.dry_run:
                 sys.stderr.write(
-                    'Tree %s^{tree} was previously tested to be bad; retesting...\n'
-                    % (rs,)
+                    'Tree %s^{tree} was previously tested to be %; retesting...\n'
+                    % (rs, good_bad_text('bad'))
                     )
                 status = None
                 # fall through
             else:
-                sys.stdout.write('%s^{tree} known-bad\n' % (r,))
-                sys.stderr.write('Tree %s^{tree} is already known to be bad!\n' % (rs,))
+                sys.stdout.write('%s^{tree} %s\n' % (r, good_bad_text('known-bad')))
+                sys.stderr.write('Tree %s^{tree} is already known to be %s!\n' % (rs, good_bad_text('bad')))
                 status = 'failed'
                 if options.keep_going:
                     fail_count += 1
@@ -663,7 +671,7 @@ def cmd_run(parser, options):
 
         elif status == 'unknown':
             if options.dry_run:
-                sys.stdout.write('%s^{tree} unknown\n' % (r,))
+                sys.stdout.write('%s^{tree} %s\n' % (r, good_bad_text('unknown')))
                 unknown_count += 1
             else:
                 status = None
@@ -727,11 +735,11 @@ def cmd_results(parser, options):
     for r in revisions:
         status = test.read_status(r)
         if status == 'good':
-            sys.stdout.write('%s^{tree} known-good\n' % (r,))
+            sys.stdout.write('%s^{tree} %s\n' % (r, good_bad_text('known-good')))
         elif status == 'bad':
-            sys.stdout.write('%s^{tree} known-bad\n' % (r,))
+            sys.stdout.write('%s^{tree} %s\n' % (r, good_bad_text('known-bad')))
         elif status == 'unknown':
-            sys.stdout.write('%s^{tree} unknown\n' % (r,))
+            sys.stdout.write('%s^{tree} %s\n' % (r, good_bad_text('unknown')))
 
 
 def cmd_forget_results(parser, options):
