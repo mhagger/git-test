@@ -1022,6 +1022,10 @@ def main(args):
     if not (options.color and sys.stdout.isatty()):
         AnsiColor.disable()
 
+    isCmdOrPowershell = (os.getenv('PROMPT', '') == '$P$G')
+    if isCmdOrPowershell:
+        AnsiColor.disable()
+
     # Expose the verbosity to child processes, in case they want to
     # adjust their output levels, too:
     os.environ['GIT_TEST_VERBOSITY'] = str(verbosity)
