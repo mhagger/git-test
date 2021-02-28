@@ -687,7 +687,7 @@ def cmd_run(parser, options):
         elif status == 'bad':
             if options.retest and not options.dry_run:
                 sys.stderr.write(
-                    'Tree %s^{tree} was previously tested to be %; retesting...\n'
+                    'Tree %s^{tree} was previously tested to be %s; retesting...\n'
                     % (rs, good_bad_text('bad'))
                     )
                 status = None
