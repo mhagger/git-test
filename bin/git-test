@@ -468,7 +468,8 @@ class Test(object):
 
         try:
             process = subprocess.Popen(cmd, **kwargs)
-            out, err = communicate(process, ''.join('%s^{tree}\n' % (r,) for r in revisions))
+            rev_args = ''.join('%s^{tree}\n' % (r,) for r in revisions)
+            out = communicate(process, rev_args)[0]
             retcode = process.poll()
             if retcode:
                 if verbosity == level - 1:
