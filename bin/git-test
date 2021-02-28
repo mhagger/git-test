@@ -108,7 +108,10 @@ def colored(text, color):
     Example:
     print('Save changes? ' + colored('Yes', AnsiColor.GREEN) + '/' + colored('No', AnsiColor.RED))
     """
-    return color + text + AnsiColor.END
+    if text[-1] == '\n':
+        return color + text[:-1] + AnsiColor.END + '\n'
+    else:
+        return color + text + AnsiColor.END
 
 def good_bad_text(value):
     if value == 'good' or value == 'known-good':
