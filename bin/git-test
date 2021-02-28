@@ -655,6 +655,7 @@ def iter_commits(parser, options):
 
 def cmd_run(parser, options):
     test = Test(options.test)
+    os.environ['GIT_TEST_NAME'] = test.name
 
     if verbosity >= 0:
         sys.stderr.write('Using test %s; command: %s\n' % (colored(test.name, AnsiColor.CYAN), colored(test.command, AnsiColor.CYAN)))
