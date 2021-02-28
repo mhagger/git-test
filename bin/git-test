@@ -592,8 +592,6 @@ def iter_commits(parser, options):
     Yield the special value 'HEAD' if the current checked-out version
     should be tested."""
 
-    revisions = []
-
     if (not options.commits or options.commits == ['HEAD']) and not options.stdin:
         yield 'HEAD'
         return
@@ -780,7 +778,6 @@ def cmd_forget_results(parser, options):
     cmd = ['git', 'config', 'test.%s.command' % (test.name,)]
     try:
         chatty_call(cmd)
-        test_defined = True
     except CalledProcessError:
         # There is no test defined; simply delete the notes reference:
         test.remove_status('Test results deleted by \'git test forget-results\'')
