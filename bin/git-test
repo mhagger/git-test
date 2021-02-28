@@ -63,36 +63,65 @@ import re
 import subprocess
 import argparse
 
-# https://pypi.org/project/colorama/
-from colorama import Fore, Back, Style, init
+class AnsiColor:
+    BLACK = '\033[0;30m'
+    RED = '\033[0;31m'
+    GREEN = '\033[0;32m'
+    YELLOW = '\033[0;33m'
+    BLUE = '\033[0;34m'
+    MAGENTA = '\033[0;35m'
+    CYAN = '\033[0;36m'
+    B_GRAY = '\033[0;37m'
+    D_GRAY = '\033[1;30m'
+    B_RED = '\033[1;31m'
+    B_GREEN = '\033[1;32m'
+    B_YELLOW = '\033[1;33m'
+    B_BLUE = '\033[1;34m'
+    B_MAGENTA = '\033[1;35m'
+    B_CYAN = '\033[1;36m'
+    WHITE = '\033[1;37m'
+    END = '\033[0m'
 
-if os.environ.get('OS') != 'Windows_NT' or os.environ.get('MSYSTEM') != 'MINGW64':
-    # Skip calling init for (most likely) a "Git Bash" window from the
-    # "Git for windows" program. It handle ANSI colour codes fine, and
-    # calling init will actually result in no color.
-    # Probably related to https://github.com/tartley/colorama/issues/104.
-    init()
+    @classmethod
+    def disable(cls):
+        cls.BLACK = ''
+        cls.RED = ''
+        cls.GREEN = ''
+        cls.YELLOW = ''
+        cls.BLUE = ''
+        cls.MAGENTA = ''
+        cls.CYAN = ''
+        cls.B_GRAY = ''
+        cls.D_GRAY = ''
+        cls.B_RED = ''
+        cls.B_GREEN = ''
+        cls.B_YELLOW = ''
+        cls.B_BLUE = ''
+        cls.B_MAGENTA = ''
+        cls.B_CYAN = ''
+        cls.WHITE = ''
+        cls.END = ''
 
 def colored(text, color):
-    """Super simple version of colored from https://pypi.org/project/termcolor/
+    """Super simple function similar to colored from https://pypi.org/project/termcolor/
 
     Example:
-    print('Save changes? ' + colored('Yes', Fore.GREEN) + '/' + colored('No', Fore.RED))
+    print('Save changes? ' + colored('Yes', AnsiColor.GREEN) + '/' + colored('No', AnsiColor.RED))
     """
-    return color + text + Style.RESET_ALL
+    return color + text + AnsiColor.END
 
 def good_bad_text(value):
     if value == 'good' or value == 'known-good':
-        return colored(value, Fore.GREEN)
+        return colored(value, AnsiColor.GREEN)
     if value == 'bad' or value == 'known-bad':
-        return colored(value, Fore.RED)
+        return colored(value, AnsiColor.RED)
     if value == 'unknown':
-        return colored(value, Fore.YELLOW)
+        return colored(value, AnsiColor.YELLOW)
     return value
 
 
 if not (0x02060000 <= sys.hexversion):
-    sys.stderr.write(colored('fatal: Python version 2.6 or later is required', Fore.RED))
+    sys.stderr.write(colored('fatal: Python version 2.6 or later is required', AnsiColor.RED))
     sys.exit(125)
 
 
@@ -476,10 +505,10 @@ class Test(object):
         except UserTestError as e:
             sys.stdout.write('%s^{tree} %s\n' % (revision, good_bad_text('bad')))
             if verbosity >= -1:
-                sys.stderr.write(colored(FAIL_HEADER_TEMPLATE % dict(revision=revision), Fore.RED))
+                sys.stderr.write(colored(FAIL_HEADER_TEMPLATE % dict(revision=revision), AnsiColor.RED))
                 cmd = ['git', '--no-pager', 'log', '-1', '--decorate', revision]
                 chatty_call(cmd, level=-1)
-                sys.stderr.write(colored(FAIL_TRAILER_TEMPLATE % dict(), Fore.RED))
+                sys.stderr.write(colored(FAIL_TRAILER_TEMPLATE % dict(), AnsiColor.RED))
                 self.write_status(revision, 'bad')
             raise
         else:
@@ -548,7 +577,7 @@ def cmd_add(parser, options):
                 # results and the user didn't explicitly ask for
                 # `--keep`; emit a warning in case the user forgot to
                 # `--forget`:
-                sys.stderr.write(colored(REUSE_RESULTS_WARNING % dict(name=test.name), Fore.YELLOW))
+                sys.stderr.write(colored(REUSE_RESULTS_WARNING % dict(name=test.name), AnsiColor.YELLOW))
 
     if initialize:
         test.initialize_status('Test results initialized by \'git test add\'')
@@ -588,7 +617,7 @@ def cmd_run(parser, options):
     test = Test(options.test)
 
     if verbosity >= 0:
-        sys.stderr.write('Using test %s; command: %s\n' % (colored(test.name, Fore.YELLOW), colored(test.command, Fore.YELLOW)))
+        sys.stderr.write('Using test %s; command: %s\n' % (colored(test.name, AnsiColor.YELLOW), colored(test.command, AnsiColor.YELLOW)))
 
     try:
         require_clean_work_tree('test-run')
@@ -603,12 +632,12 @@ def cmd_run(parser, options):
         except UserTestError as e:
             sys.stdout.write('working-tree %s\n' % good_bad_text('bad'))
             if verbosity >= -1:
-                sys.stderr.write(colored('\n!!! TEST FAILED !!!\n', Fore.RED))
+                sys.stderr.write(colored('\n!!! TEST FAILED !!!\n', AnsiColor.RED))
             sys.exit(e.returncode)
         else:
             sys.stdout.write('working-tree %s\n' % good_bad_text('good'))
             if verbosity >= -1:
-                sys.stderr.write(colored('\nTEST SUCCESSFUL\n', Fore.GREEN))
+                sys.stderr.write(colored('\nTEST SUCCESSFUL\n', AnsiColor.GREEN))
         finally:
             sys.stderr.write(
                 'Note: working tree is dirty; results will not be saved.\n'
@@ -700,7 +729,7 @@ def cmd_run(parser, options):
                 test_text = 'TEST'
             else:
                 test_text = 'TESTS'
-            sys.stderr.write(colored('\n!!! %s %s FAILED !!!\n' % (fail_count, test_text), Fore.RED))
+            sys.stderr.write(colored('\n!!! %s %s FAILED !!!\n' % (fail_count, test_text), AnsiColor.RED))
 
         if last_failure is not None:
             sys.exit(last_failure)
@@ -712,12 +741,12 @@ def cmd_run(parser, options):
                 test_text = 'TEST'
             else:
                 test_text = 'TESTS'
-            sys.stderr.write(colored('\n%s %s UNKNOWN\n' % (unknown_count, test_text), Fore.YELLOW))
+            sys.stderr.write(colored('\n%s %s UNKNOWN\n' % (unknown_count, test_text), AnsiColor.YELLOW))
 
         sys.exit(2)
     else:
         if verbosity >= -1:
-            sys.stderr.write(colored('\nALL TESTS SUCCESSFUL\n', Fore.GREEN))
+            sys.stderr.write(colored('\nALL TESTS SUCCESSFUL\n', AnsiColor.GREEN))
         return
 
 
@@ -1005,7 +1034,7 @@ if __name__ == '__main__':
     try:
         main(sys.argv[1:])
     except Fatal as e:
-        sys.stderr.write(colored('\nERROR!\n%s\n\n' % (e,), Fore.RED))
+        sys.stderr.write(colored('\nERROR!\n%s\n\n' % (e,), AnsiColor.RED))
         sys.exit(125)
 
 
