@@ -506,7 +506,7 @@ class Test(object):
     def run_and_record(self, revision):
         try:
             self.run()
-        except UserTestError as e:
+        except UserTestError:
             sys.stdout.write('%s^{tree} %s\n' % (revision, good_bad_text('bad')))
             if verbosity >= -1:
                 sys.stderr.write(colored(FAIL_HEADER_TEMPLATE % dict(revision=revision), AnsiColor.RED))
