@@ -831,6 +831,14 @@ def main(args):
             action='count', default=0,
             help=quiet_help,
             )
+        parser.add_argument(
+            '--color', dest='color', action='store_true', default=True,
+            help='print status with colors',
+            )
+        parser.add_argument(
+            '--no-color', dest='color', action='store_false',
+            help='print status without colors',
+            )
 
     add_verbosity_options(parser, help=True)
 
@@ -1007,6 +1015,9 @@ def main(args):
     options = parser.parse_args(args)
 
     verbosity = options.verbose - options.quiet
+
+    if not (options.color and sys.stdout.isatty()):
+        AnsiColor.disable()
 
     # Expose the verbosity to child processes, in case they want to
     # adjust their output levels, too:
