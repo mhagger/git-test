@@ -8,6 +8,11 @@ be used if test are run through scripts.
 
 * `GIT_TEST_NAME` - Corresponds to the name of the current running test.
 
+* `GIT_TEST_PREVIOUS_CHECKED_OUT_COMMIT` - When `git-test` runs tests on
+several commits, this variable contains the commit that was checked out for
+the previous test. Will be blank for the first commit checked out in a test
+run.
+
 # Example usage
 
 Q: Wow, the following seems really complicated, do I really have to do all that
@@ -30,6 +35,21 @@ then
     else
         echo "Using eslint"
     fi
+fi
+
+PARENT=`git log --pretty=%P -n 1 HEAD`
+# If current commit is not a merge commit ...
+if [ `echo $PARENT | wc -w` -eq 1 ]
+then
+    if [ "$GIT_TEST_PREVIOUS_CHECKED_OUT_COMMIT" = "$PARENT" ]
+    then
+        # ... and package.json has not changed then skip running npm install.
+        git diff --quiet "$PARENT" -- package.json || npm install
+    else
+        npm install
+    fi
+else
+    npm install
 fi
 
 git tag -f current-git-test-"$GIT_TEST_NAME"
@@ -62,3 +82,15 @@ There is no "garbage collection" of such current test tags, so they will be
 left decaying if not actively cleaned up. So if this is a worthwile thing to do
 is completely up to you. But this is one example of what the `GIT_TEST_NAME`
 environment variable can be used for.
+
+---
+
+Running `npm install` can be quite expensive, but should really be run for
+every single test in order to ensure a proper environment. However by checking
+if the current test's parent just has been tested and if there is no changes in
+the package.json file, then we can skip running `npm install` because the
+parent would already have had the proper setup.
+
+The same principle can be used for git submodules where you run
+`git submodule update --init --recursive` on the first test and then repeat
+only if `.gitmodules` changes later.

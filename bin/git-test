@@ -713,6 +713,7 @@ def cmd_run(parser, options):
     fail_count = 0
     unknown_count = 0
 
+    os.environ['GIT_TEST_PREVIOUS_CHECKED_OUT_COMMIT'] = ''
     for r in revisions:
         cmd = ['git', 'rev-parse', '--short', r]
         rs = check_output(cmd).rstrip()
@@ -759,6 +760,7 @@ def cmd_run(parser, options):
                     fail_count += 1
                 else:
                     sys.exit(e.returncode)
+            os.environ['GIT_TEST_PREVIOUS_CHECKED_OUT_COMMIT'] = r
 
     if not testing_head:
         cmd = ['git', 'checkout', '-f', re.sub(r'^refs/heads/', '', head)]
