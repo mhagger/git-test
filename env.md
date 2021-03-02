@@ -10,6 +10,13 @@ be used if test are run through scripts.
 
 # Example usage
 
+Q: Wow, the following seems really complicated, do I really have to do all that
+just to run a test?
+
+A: Not at all. The following is more meant to be an example exploring
+everything than can be done with environment variables more than a template
+to be copied for everyone.
+
 Example of using environment variables in a build script named `run-lint.sh`:
 
 ```shell
