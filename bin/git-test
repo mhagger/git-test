@@ -580,7 +580,7 @@ def cmd_add(parser, options):
                 # results and the user didn't explicitly ask for
                 # `--keep`; emit a warning in case the user forgot to
                 # `--forget`:
-                sys.stderr.write(colored(REUSE_RESULTS_WARNING % dict(name=test.name), AnsiColor.YELLOW))
+                sys.stderr.write(colored(REUSE_RESULTS_WARNING % dict(name=test.name), AnsiColor.CYAN))
 
     if initialize:
         test.initialize_status('Test results initialized by \'git test add\'')
@@ -620,7 +620,7 @@ def cmd_run(parser, options):
     test = Test(options.test)
 
     if verbosity >= 0:
-        sys.stderr.write('Using test %s; command: %s\n' % (colored(test.name, AnsiColor.YELLOW), colored(test.command, AnsiColor.YELLOW)))
+        sys.stderr.write('Using test %s; command: %s\n' % (colored(test.name, AnsiColor.CYAN), colored(test.command, AnsiColor.CYAN)))
 
     try:
         require_clean_work_tree('test-run')
