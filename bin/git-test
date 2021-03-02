@@ -640,7 +640,7 @@ def iter_commits(parser, options):
         if len(limits) == 1:
             yield rev_parse('%s^{commit}' % (arg,))
         elif len(limits) == 2:
-            for revision in rev_list('--reverse', arg):
+            for revision in rev_list('--reverse', '--topo-order', arg):
                 yield revision
         else:
             parser.error(
