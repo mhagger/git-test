@@ -61,8 +61,7 @@ test_expect_success 'Verify number of notes' '
 '
 
 test_expect_success 'Forgetting default and not affecting other tests' '
-	rm -f expected &&
-	touch expected &&
+	echo "All test results for test default were forgotten." >expected &&
 	git-test forget-results >actual &&
 	test_cmp expected actual &&
 	echo 0 > expected &&
@@ -94,8 +93,7 @@ test_expect_success 'Add default test results again' '
 
 
 test_expect_success 'Forgetting t1 and not affecting other tests' '
-	rm -f expected &&
-	touch expected &&
+	echo "All test results for test t1 were forgotten." >expected &&
 	git-test forget-results --test t1 >actual &&
 	test_cmp expected actual &&
 	echo 4 > expected &&

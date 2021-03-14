@@ -838,6 +838,9 @@ def cmd_forget_results(parser, options):
         test.initialize_status(
             'Test results reinitialized by \'git test forget-results\''
             )
+        sys.stdout.write(colored('All test results for test ', AnsiColor.GREEN))
+        sys.stdout.write(colored(test.name, AnsiColor.CYAN))
+        sys.stdout.write(colored(' were forgotten.\n', AnsiColor.GREEN))
 
 
 test_re = re.compile(r'^test\.(?P<name>.*)\.command$')
