@@ -826,8 +826,6 @@ def cmd_results(parser, options):
 
 
 def cmd_forget_results(parser, options):
-    test = Test(options.test)
-
     NO_ARGUMENTS_WARNING = """\
 WARNING: Which test results to forget was not specified. Assuming --all for
 backwards compability. This backwards compability might be removed in the
@@ -837,6 +835,12 @@ future, please update to explicit specify what should be removed.
     if not options.all:
         sys.stderr.write(colored(NO_ARGUMENTS_WARNING, AnsiColor.CYAN))
         options.all = True
+
+    forget_results_for_test(options.test)
+
+
+def forget_results_for_test(name):
+    test = Test(name)
 
     cmd = ['git', 'config', 'test.%s.command' % (test.name,)]
     try:
