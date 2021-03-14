@@ -69,7 +69,7 @@ If you want to forget particular old test results without retesting, run `git te
 
 If you want to permanently forget *all* stored results for a particular test (e.g., if something in your environment has changed), run
 
-    git test forget-results [--test=<name>]
+    git test forget-results --all [--test=<name>]
 
 ### Continue on test failures
 

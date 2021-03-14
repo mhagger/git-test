@@ -62,7 +62,8 @@ test_expect_success 'Verify number of notes' '
 
 test_expect_success 'Forgetting default and not affecting other tests' '
 	echo "All test results for test default were forgotten." >expected &&
-	git-test forget-results >actual &&
+	git-test forget-results --all >actual &&
+	test_must_fail grep -q WARNING actual
 	test_cmp expected actual &&
 	echo 0 > expected &&
 	git notes --ref=tests/default list | wc -l >actual &&
@@ -94,7 +95,8 @@ test_expect_success 'Add default test results again' '
 
 test_expect_success 'Forgetting t1 and not affecting other tests' '
 	echo "All test results for test t1 were forgotten." >expected &&
-	git-test forget-results --test t1 >actual &&
+	git-test forget-results --all --test t1 >actual &&
+	test_must_fail grep -q WARNING actual
 	test_cmp expected actual &&
 	echo 4 > expected &&
 	git notes --ref=tests/default list | wc -l >actual &&
@@ -110,6 +112,24 @@ test_expect_success 'Forgetting t1 and not affecting other tests' '
 	true &&
 	echo 0 > expected &&
 	git notes --ref=tests/t3 list | wc -l >actual &&
+	test_cmp expected actual &&
+	true
+'
+
+# sed command: On line 1 remove from the first space and the rest, and delete
+# lines 2 and till the last line, e.g. only keep first word on first line.
+test_expect_success 'Missing --all argument produces warning' '
+	echo "WARNING:" >expected
+	git-test forget-results 2>actual &&
+	sed -i "1s/ .*//; 2,\$d" actual &&
+	test_cmp expected actual
+'
+
+
+test_expect_success 'Should not give output on non-existent test' '
+	rm -f expected &&
+	touch expected &&
+	git-test forget-results --all -t this-test-does-not-exist >actual &&
 	test_cmp expected actual &&
 	true
 '

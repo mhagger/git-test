@@ -828,6 +828,16 @@ def cmd_results(parser, options):
 def cmd_forget_results(parser, options):
     test = Test(options.test)
 
+    NO_ARGUMENTS_WARNING = """\
+WARNING: Which test results to forget was not specified. Assuming --all for
+backwards compability. This backwards compability might be removed in the
+future, please update to explicit specify what should be removed.
+"""
+
+    if not options.all:
+        sys.stderr.write(colored(NO_ARGUMENTS_WARNING, AnsiColor.CYAN))
+        options.all = True
+
     cmd = ['git', 'config', 'test.%s.command' % (test.name,)]
     try:
         chatty_call(cmd)
@@ -1060,6 +1070,10 @@ def main(args):
         '--test', '-t', metavar='name',
         action='store', default='default',
         help='name of test whose results should be forgotten (default is \'default\')',
+        )
+    subparser.add_argument(
+        '--all', action='store_true',
+        help='forget all existing test results for the current test',
         )
     add_verbosity_options(subparser)
 
