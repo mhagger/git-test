@@ -799,8 +799,19 @@ def cmd_list(parser, options):
         m = test_re.match(key)
         if m:
             name = m.group('name')
+            command = value.rstrip()
+            command_lines = command.split('\n')
+
+            if not command_lines:
+                continue
+
             print('%s:' % (name,))
-            print('    command = %s' % (value,))
+            if len(command_lines) == 1:
+                print('    command = %s' % (command,))
+            else:
+                print('    command:')
+                for command_line in command_lines:
+                    print('        %s' % (command_line,))
 
 
 def cmd_remove(parser, options):
