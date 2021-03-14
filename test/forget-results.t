@@ -116,9 +116,36 @@ test_expect_success 'Forgetting t1 and not affecting other tests' '
 	true
 '
 
+test_expect_success 'Forgetting all test results' '
+	echo "All test results for test default were forgotten." >expected &&
+	echo "All test results for test t1 were forgotten." >>expected &&
+	echo "All test results for test t2 were forgotten." >>expected &&
+	echo "All test results for test t3 were forgotten." >>expected &&
+	git-test forget-results --all-tests >actual &&
+	test_must_fail grep -q WARNING actual
+	test_cmp expected actual &&
+	echo 0 > expected &&
+	git notes --ref=tests/default list | wc -l >actual &&
+	test_cmp expected actual &&
+	true &&
+	echo 0 > expected &&
+	git notes --ref=tests/t1 list | wc -l >actual &&
+	test_cmp expected actual &&
+	true &&
+	echo 0 > expected &&
+	git notes --ref=tests/t2 list | wc -l >actual &&
+	test_cmp expected actual &&
+	true &&
+	echo 0 > expected &&
+	git notes --ref=tests/t3 list | wc -l >actual &&
+	test_cmp expected actual &&
+	true
+'
+
+
 # sed command: On line 1 remove from the first space and the rest, and delete
 # lines 2 and till the last line, e.g. only keep first word on first line.
-test_expect_success 'Missing --all argument produces warning' '
+test_expect_success 'Missing --all or --all-tests argument produces warning' '
 	echo "WARNING:" >expected
 	git-test forget-results 2>actual &&
 	sed -i "1s/ .*//; 2,\$d" actual &&

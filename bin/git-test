@@ -832,11 +832,15 @@ backwards compability. This backwards compability might be removed in the
 future, please update to explicit specify what should be removed.
 """
 
-    if not options.all:
+    if not (options.all or options.all_tests):
         sys.stderr.write(colored(NO_ARGUMENTS_WARNING, AnsiColor.CYAN))
         options.all = True
 
-    forget_results_for_test(options.test)
+    if options.all_tests:
+        for test in iter_tests():
+            forget_results_for_test(test.name)
+    else:
+        forget_results_for_test(options.test)
 
 
 def forget_results_for_test(name):
@@ -1078,6 +1082,11 @@ def main(args):
     subparser.add_argument(
         '--all', action='store_true',
         help='forget all existing test results for the current test',
+        )
+    subparser.add_argument(
+        '--all-tests',
+        action='store_true',
+        help='forget all existing test results for all tests',
         )
     add_verbosity_options(subparser)
 

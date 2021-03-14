@@ -71,6 +71,10 @@ If you want to permanently forget *all* stored results for a particular test (e.
 
     git test forget-results --all [--test=<name>]
 
+If you want to permanently forget *all* stored results for *all test*, run
+
+    git test forget-results --all-tests
+
 ### Continue on test failures
 
 Normally, `git test run` stops at the first broken commit that it finds. If you'd prefer for it to continue even after a failure, use the `--keep-going`/`-k` option.
