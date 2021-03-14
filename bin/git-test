@@ -788,6 +788,21 @@ def cmd_forget_results(parser, options):
             )
 
 
+test_re = re.compile(r'^test\.(?P<name>.*)\.command$')
+
+def cmd_list(parser, options):
+    cmd = ['git', 'config', '--get-regexp', '--null', '^test\.']
+    out = check_output(cmd)
+    lines = [line for line in out.split('\0') if line]
+    for line in lines:
+        (key, value) = line.split('\n', 1)
+        m = test_re.match(key)
+        if m:
+            name = m.group('name')
+            print('%s:' % (name,))
+            print('    command = %s' % (value,))
+
+
 def cmd_remove(parser, options):
     test = Test(options.test)
 
@@ -986,6 +1001,15 @@ def main(args):
     add_verbosity_options(subparser)
 
     subparser = subparsers.add_parser(
+        'list',
+        description=(
+            'List the tests that are currently defined.'
+            ),
+        help='list the tests that are currently defined',
+        )
+    add_verbosity_options(subparser)
+
+    subparser = subparsers.add_parser(
         'remove',
         description=(
             'Remove a test definition and all of its stored results.'
@@ -1044,6 +1068,8 @@ def main(args):
         cmd_results(parser, options)
     elif options.subcommand == 'forget-results':
         cmd_forget_results(parser, options)
+    elif options.subcommand == 'list':
+        cmd_list(parser, options)
     elif options.subcommand == 'remove':
         cmd_remove(parser, options)
     elif options.subcommand == 'help':
