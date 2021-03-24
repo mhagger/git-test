@@ -402,11 +402,11 @@ FAILURE!
 """
 
 class Test(object):
-    def __init__(self, name):
+    def __init__(self, name, _command=None):
         self.name = name
         self.notes_ref = 'tests/%s' % (self.name,)
         self.full_ref = 'refs/notes/tests/%s' % (self.name,)
-        self._command = None
+        self._command = _command
 
     def initialize_status(self, msg):
         cmd = ['git', 'commit-tree', '-m', msg, get_empty_tree()]
@@ -532,6 +532,44 @@ class Test(object):
         cmd = ['git', 'config', '--remove-section', 'test.%s' % (self.name,)]
         chatty_call(cmd)
         self.remove_status(msg)
+
+
+test_config_re = re.compile(r'^test\.(?P<name>.*)\.(?P<subkey>[^\.]+)$')
+
+def iter_tests():
+    """Iterate over all tests that are defined in the git configuration."""
+
+    cmd = ['git', 'config', '--get-regexp', '--null', '^test\.']
+    out = check_output(cmd)
+    lines = [line for line in out.split('\0') if line]
+
+    # A list of test names found (to preserve their order):
+    names = []
+    # A map `{test_name : {subkey : value}}`:
+    tests = {}
+
+    for line in lines:
+        (key, value) = line.split('\n', 1)
+        m = test_config_re.match(key)
+
+        if m:
+            name = m.group('name')
+            subkey = m.group('subkey')
+
+            test = tests.get(name)
+            if not test:
+                names.append(name)
+                test = tests[name] = {}
+
+            if subkey == 'command':
+                tests.setdefault(name, {})['command'] = value
+            else:
+                # Unknown subkey. Ignore it.
+                pass
+
+    for name in names:
+        test = tests[name]
+        yield Test(name, _command=test.get('command'))
 
 
 def prepare_revision(r):
@@ -791,27 +829,24 @@ def cmd_forget_results(parser, options):
 test_re = re.compile(r'^test\.(?P<name>.*)\.command$')
 
 def cmd_list(parser, options):
-    cmd = ['git', 'config', '--get-regexp', '--null', '^test\.']
-    out = check_output(cmd)
-    lines = [line for line in out.split('\0') if line]
-    for line in lines:
-        (key, value) = line.split('\n', 1)
-        m = test_re.match(key)
-        if m:
-            name = m.group('name')
-            command = value.rstrip()
-            command_lines = command.split('\n')
+    for test in iter_tests():
+        command = test.command
+        if command is None:
+            continue
 
-            if not command_lines:
-                continue
+        command = command.rstrip()
+        command_lines = command.split('\n')
 
-            print('%s:' % (name,))
-            if len(command_lines) == 1:
-                print('    command = %s' % (command,))
-            else:
-                print('    command:')
-                for command_line in command_lines:
-                    print('        %s' % (command_line,))
+        if not command_lines:
+            continue
+
+        print('%s:' % (test.name,))
+        if len(command_lines) == 1:
+            print('    command = %s' % (command,))
+        else:
+            print('    command:')
+            for command_line in command_lines:
+                print('        %s' % (command_line,))
 
 
 def cmd_remove(parser, options):
