@@ -515,9 +515,21 @@ class Test(object):
                 sys.stderr.write(colored(FAIL_TRAILER_TEMPLATE % dict(), AnsiColor.RED))
                 self.write_status(revision, 'bad')
             raise
-        else:
-            sys.stdout.write('%s^{tree} %s\n' % (revision, good_bad_text('good')))
-            self.write_status(revision, 'good')
+
+        try:
+            require_clean_work_tree('mark good')
+        except UncleanWorkTreeError:
+            sys.stdout.write('%s^{tree} %s\n' % (revision, good_bad_text('bad')))
+            if verbosity >= -1:
+                sys.stderr.write(colored(FAIL_HEADER_TEMPLATE % dict(revision=revision), AnsiColor.RED))
+                cmd = ['git', '--no-pager', 'log', '-1', '--decorate', revision]
+                chatty_call(cmd, level=-1)
+                sys.stderr.write(colored(FAIL_TRAILER_TEMPLATE % dict(), AnsiColor.RED))
+                self.write_status(revision, 'bad')
+            raise
+
+        sys.stdout.write('%s^{tree} %s\n' % (revision, good_bad_text('good')))
+        self.write_status(revision, 'good')
 
     def remove_status(self, msg):
         """Delete the note reference for this test."""

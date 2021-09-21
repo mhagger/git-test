@@ -163,6 +163,15 @@ test_expect_success 'default (passing): combine args and stdin' '
 	test_cmp expected numbers.log
 '
 
+test_expect_success 'default (passing): stop if working tree is dirty' '
+	rm -f numbers.log &&
+	test_when_finished "git reset --hard HEAD" &&
+	git-test add --test dirty "echo 1 >> number" &&
+	gen_stdout c4 bad > expected-stdout &&
+	test_expect_code 125 git-test run --test dirty c3..c5 >actual-stdout &&
+	test_cmp expected-stdout actual-stdout
+'
+
 test_expect_success 'default (failing-4-7-8): test range' '
 	git-test forget-results &&
 	git-test add "test-number --log=numbers.log --bad 4 7 8 666 --good \*" &&
