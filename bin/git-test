@@ -530,7 +530,13 @@ class Test(object):
 
     def remove(self, msg):
         cmd = ['git', 'config', '--remove-section', 'test.%s' % (self.name,)]
-        chatty_call(cmd)
+        try:
+            chatty_call(cmd)
+        except CalledProcessError as e:
+            # No such section
+            if e.returncode == 128:
+                sys.exit(0)
+            raise CalledProcessError(e.returncode, e.cmd, _decode_output(e.output))
         self.remove_status(msg)
 
 
