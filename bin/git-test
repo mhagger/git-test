@@ -540,7 +540,15 @@ def iter_tests():
     """Iterate over all tests that are defined in the git configuration."""
 
     cmd = ['git', 'config', '--get-regexp', '--null', '^test\.']
-    out = check_output(cmd)
+    try:
+        out = check_output(cmd)
+    except CalledProcessError as e:
+        # No tests
+        if e.returncode == 1:
+            sys.exit(0)
+        else:
+            raise CalledProcessError(e.returncode, e.cmd, _decode_output(e.output))
+
     lines = [line for line in out.split('\0') if line]
 
     # A list of test names found (to preserve their order):
@@ -1130,5 +1138,3 @@ if __name__ == '__main__':
     except Fatal as e:
         sys.stderr.write(colored('\nERROR!\n%s\n\n' % (e,), AnsiColor.RED))
         sys.exit(125)
-
-
