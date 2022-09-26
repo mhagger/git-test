@@ -27,7 +27,7 @@ Example of using environment variables in a build script named `run-lint.sh`:
 ```shell
 #!/bin/sh
 
-if [ ${GIT_TEST_VERBOSITY:-0} -ge 1 ]
+if [ "${GIT_TEST_VERBOSITY:-0}" -ge 1 ]
 then
     if [ -f tslint.json ]
     then
@@ -37,9 +37,9 @@ then
     fi
 fi
 
-PARENT=`git log --pretty=%P -n 1 HEAD`
+PARENT=$(git log --pretty=%P -n 1 HEAD)
 # If current commit is not a merge commit ...
-if [ `echo $PARENT | wc -w` -eq 1 ]
+if [ "$(echo "$PARENT" | wc -w)" -eq 1 ]
 then
     if [ "$GIT_TEST_PREVIOUS_CHECKED_OUT_COMMIT" = "$PARENT" ]
     then
