@@ -494,18 +494,26 @@ class Test(object):
         chatty_call(cmd)
         self._command = value
 
-    def run(self):
+    def run(self, extra_env={}):
         """Run this test against the current contents of the working tree."""
+
+        env = os.environ.copy()
+        if extra_env:
+            for k, v in extra_env.items():
+                if v is not None:
+                    env[k] = v
+                elif k in env:
+                    del env[k]
 
         cmd = ['sh', '-c', self.command]
         try:
-            chatty_call(cmd, level=0)
+            chatty_call(cmd, level=0, env=env)
         except CalledProcessError as e:
             raise UserTestError(e.returncode, e.cmd, e.output)
 
-    def run_and_record(self, revision):
+    def run_and_record(self, revision, extra_env={}):
         try:
-            self.run()
+            self.run(extra_env=extra_env)
         except UserTestError:
             sys.stdout.write('%s^{tree} %s\n' % (revision, good_bad_text('bad')))
             if verbosity >= -1:
@@ -640,7 +648,7 @@ def iter_commits(parser, options):
         if len(limits) == 1:
             yield rev_parse('%s^{commit}' % (arg,))
         elif len(limits) == 2:
-            for revision in rev_list('--reverse', arg):
+            for revision in rev_list('--reverse', '--topo-order', arg):
                 yield revision
         else:
             parser.error(
@@ -655,6 +663,11 @@ def iter_commits(parser, options):
 
 def cmd_run(parser, options):
     test = Test(options.test)
+    extra_env = {
+        'GIT_TEST_NAME' : test.name,
+        'GIT_TEST_PREVIOUS_CHECKED_OUT_COMMIT' : None,
+        'GIT_TEST_VERBOSITY' : str(verbosity),
+    }
 
     if verbosity >= 0:
         sys.stderr.write('Using test %s; command: %s\n' % (colored(test.name, AnsiColor.CYAN), colored(test.command, AnsiColor.CYAN)))
@@ -668,7 +681,7 @@ def cmd_run(parser, options):
             raise
 
         try:
-            test.run()
+            test.run(extra_env=extra_env)
         except UserTestError as e:
             sys.stdout.write('working-tree %s\n' % good_bad_text('bad'))
             if verbosity >= -1:
@@ -750,7 +763,7 @@ def cmd_run(parser, options):
                 prepare_revision(r)
 
             try:
-                test.run_and_record(r)
+                test.run_and_record(r, extra_env=extra_env)
             except UserTestError as e:
                 # This commit has failed the test.
                 if options.keep_going:
@@ -758,6 +771,7 @@ def cmd_run(parser, options):
                     fail_count += 1
                 else:
                     sys.exit(e.returncode)
+            extra_env['GIT_TEST_PREVIOUS_CHECKED_OUT_COMMIT'] = r
 
     if not testing_head:
         cmd = ['git', 'checkout', '-f', re.sub(r'^refs/heads/', '', head)]

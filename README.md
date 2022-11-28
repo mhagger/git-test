@@ -95,6 +95,10 @@ or
 
     git test run --help
 
+## Exposed environment variables
+
+`git test` exports some environment variables which can be used by test
+commands. See [this file](./env.md) for details.
 
 ## Best practice: use `git test` in a linked worktree
 
