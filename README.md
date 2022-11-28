@@ -12,13 +12,12 @@ If a commit in the range has already been tested, then by default `git test` rep
 
 The test results are recorded by the *tree* that was tested, not the commit, so old test results remain valid even across some kinds of commit rewriting:
 
-*   If commits are rewritten to change their log messages, authorship, dates, etc., the test results remain valid.
-*   If consecutive commits are squashed, the results remain valid.
-*   If a commit is split into two, only the first (partial) commit needs to be tested.
-*   If some commits deep in a branch are reordered, the test results for commits built on top of the reordered commits often remain valid.
+* If commits are rewritten to change their log messages, authorship, dates, etc., the test results remain valid.
+* If consecutive commits are squashed, the results remain valid.
+* If a commit is split into two, only the first (partial) commit needs to be tested.
+* If some commits deep in a branch are reordered, the test results for commits built on top of the reordered commits often remain valid.
 
 Of course this means that your tests should not depend on things besides the files in the tree. For example, whether your test passes/fails should *not* depend on the current branch name or commit message.
-
 
 ## Usage
 
@@ -112,7 +111,6 @@ The last command can be re-run any time; it only does significant work when some
 
 Because linked worktrees share branches and the git configuration with the main repository, test definitions and test results are visible across all worktrees. So you could even run multiple tests at the same time in multiple linked worktrees.
 
-
 ## Installation
 
 Requirements:
@@ -122,38 +120,35 @@ Requirements:
 
 Just put `bin/git-test` somewhere in your `$PATH`, adjusting its first line if necessary to invoke the desired Python interpreter properly in your environment.
 
-
 ## Ideas for future enhancements
 
 Some other features that would be nice:
 
-*   Be more consistent about restoring `HEAD`. `git test run` currently checks out the branch that you started on when it is finished, but only if all of the tests passed. We need some kind of `git test reset` command analogous to `git bisect reset`.
+* Be more consistent about restoring `HEAD`. `git test run` currently checks out the branch that you started on when it is finished, but only if all of the tests passed. We need some kind of `git test reset` command analogous to `git bisect reset`.
 
-*   `git test bisect`: run `git bisect run` against a range of commits, using a configured test as the command that `bisect` uses to decide whether a commit is good/bad.
+* `git test bisect`: run `git bisect run` against a range of commits, using a configured test as the command that `bisect` uses to decide whether a commit is good/bad.
 
-*   `git test prune`: delete notes for obsolete trees.
+* `git test prune`: delete notes for obsolete trees.
 
-*   Continuous testing mode, where `git test` watches the repository for changes and re-runs itself automatically whenever the commits it is watching change.
+* Continuous testing mode, where `git test` watches the repository for changes and re-runs itself automatically whenever the commits it is watching change.
 
-*   Dependencies between tests; for example:
+* Dependencies between tests; for example:
 
-    *   Provide a way to say "if my `full` test passes, that implies that the `build` test would also pass".
+  * Provide a way to say "if my `full` test passes, that implies that the `build` test would also pass".
 
-    *   Provide a way to run the `build` test (and record the `build` test's results) as the first step of the `full` test.
+  * Provide a way to run the `build` test (and record the `build` test's results) as the first step of the `full` test.
 
-*   Allow trees to be marked `skip`, if they shouldn't be tested (e.g., due to a known breakage). Perhaps allow the test script to emit a special return code to ask that the commit be marked `skip` (probably following the convention of `git bisect run`).
+* Allow trees to be marked `skip`, if they shouldn't be tested (e.g., due to a known breakage). Perhaps allow the test script to emit a special return code to ask that the commit be marked `skip` (probably following the convention of `git bisect run`).
 
-*   Remember return codes and give them back out if the old result is reused.
+* Remember return codes and give them back out if the old result is reused.
 
-*   Add a `git test fix <range>`, which starts an interactive rebase, changing the command for the first broken commit from "pick" to "edit".
+* Add a `git test fix <range>`, which starts an interactive rebase, changing the command for the first broken commit from "pick" to "edit".
 
-*   Support tests that depend on the *commit*, not the *tree*, that they are run against.
-
+* Support tests that depend on the *commit*, not the *tree*, that they are run against.
 
 ## License
 
-`git test` is released under the GPLv2+ license. Pull requests are welcome at the project's GitHub page, https://github.com/mhagger/git-test
-
+`git test` is released under the GPLv2+ license. Pull requests are welcome at the project's GitHub page, <https://github.com/mhagger/git-test>.
 
 ## Caveats and disclaimers
 
