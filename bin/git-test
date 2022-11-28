@@ -826,7 +826,25 @@ def cmd_results(parser, options):
 
 
 def cmd_forget_results(parser, options):
-    test = Test(options.test)
+    NO_ARGUMENTS_WARNING = """\
+WARNING: Which test results to forget was not specified. Assuming --all for
+backwards compability. This backwards compability might be removed in the
+future, please update to explicit specify what should be removed.
+"""
+
+    if not (options.all or options.all_tests):
+        sys.stderr.write(colored(NO_ARGUMENTS_WARNING, AnsiColor.CYAN))
+        options.all = True
+
+    if options.all_tests:
+        for test in iter_tests():
+            forget_results_for_test(test.name)
+    else:
+        forget_results_for_test(options.test)
+
+
+def forget_results_for_test(name):
+    test = Test(name)
 
     cmd = ['git', 'config', 'test.%s.command' % (test.name,)]
     try:
@@ -838,6 +856,9 @@ def cmd_forget_results(parser, options):
         test.initialize_status(
             'Test results reinitialized by \'git test forget-results\''
             )
+        sys.stdout.write(colored('All test results for test ', AnsiColor.GREEN))
+        sys.stdout.write(colored(test.name, AnsiColor.CYAN))
+        sys.stdout.write(colored(' were forgotten.\n', AnsiColor.GREEN))
 
 
 test_re = re.compile(r'^test\.(?P<name>.*)\.command$')
@@ -1057,6 +1078,15 @@ def main(args):
         '--test', '-t', metavar='name',
         action='store', default='default',
         help='name of test whose results should be forgotten (default is \'default\')',
+        )
+    subparser.add_argument(
+        '--all', action='store_true',
+        help='forget all existing test results for the current test',
+        )
+    subparser.add_argument(
+        '--all-tests',
+        action='store_true',
+        help='forget all existing test results for all tests',
         )
     add_verbosity_options(subparser)
 
