@@ -6,9 +6,7 @@ then
 	exit 1
 fi
 
-while true
-do
-	git test run "$@"
+wait_for_next_run() {
 	n=0
 	while [[ $n -lt ${GIT_TEST_CONTINOUS_INTERVAL:-30} ]]
 	do
@@ -17,4 +15,11 @@ do
 		sleep 1
 	done
 	echo
+}
+
+while true
+do
+	git test run "$@"
+
+	wait_for_next_run
 done
