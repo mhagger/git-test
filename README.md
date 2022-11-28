@@ -68,7 +68,11 @@ You can define multiple tests in a single repository (e.g., cheap vs. expensive 
 
 If you have flaky tests that occasionally fail for bogus reasons, you might want to re-run the test against a commit even though `git test` has already recorded a result for that commit. To do so, run `git test run` with the `--force`/`-f` or `--retest` options.
 
-If you want to forget particular old test results without retesting, run `git test run` with the `--forget` option.
+If you want to forget particular old test results without retesting, run
+`git test run` with the `--forget` option, e.g.
+
+    git test run [--test=<name>] --forget commit1
+    git test run [--test=<name>] --forget commit1..commit2
 
 If you want to permanently forget *all* stored results for a particular test (e.g., if something in your environment has changed), run
 
