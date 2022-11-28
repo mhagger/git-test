@@ -154,6 +154,8 @@ Some other features that would be nice:
 
 `git test` has pretty good automated tests, but it undoubtedly still has bugs and rough edges. Use it at your own risk.
 
+### Detached head
+
 Please note that when you tell `git test run` to test specified commits, it checks those commits out in your working directory. If the tests fail, it leaves the failing commit checked out *in a detached HEAD state*. This is intentional, so that you can examine the cause of the failure. But it means that if you had changes on your original HEAD that weren't part of any branch, they will now be unreachable.
 
 If you don't know what a detached HEAD state is, please read up on it. Additionally, **it is recommended that you run `git test` in a separate worktree**, which is more convenient anyway (see above for instructions). Note that the `git worktree` command was added in Git release 2.5, so make sure you are using that version of Git or (preferably) newer.
@@ -167,3 +169,19 @@ and
     git test run HEAD
 
 don't change the commit that is checked out, and they won't change your working copy to a detached HEAD state.
+
+### Test result "noise" when viewing history with `--all`
+
+Notice that as a side effect of `git test` saving test results in git notes,
+these notes will become visible "noise" when viewing history with `git log` or
+`gitk` and using the version specifier `--all`. The solution is to tell git
+to ignore those notes with `--exclude` (NB, must be specified *before* `--all`
+in order to have effect).
+
+Writing the full exclude phrase every time will probably be too cumbersome, so
+you most likely want to write wrapper scripts like the following
+
+    #!/bin/sh
+    exec gitk --exclude=refs/notes/* --all "$@" &
+
+or include `--exclude` in your git aliases.
