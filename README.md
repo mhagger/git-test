@@ -8,7 +8,9 @@ and as often as you like run
 
     git test run master..mybranch
 
-`git test` will test the commits in the specified range, reporting any failures. The pass/fail results of running tests are also recorded permanently in your repository as Git "notes" (see `git-notes(1)`).
+`git test` will test the commits in the specified range, reporting any failures.
+The pass/fail results of running tests are also recorded permanently in your
+repository as Git "notes" (see [git-notes(1)](https://www.git-scm.com/docs/git-notes)).
 
 If a commit in the range has already been tested, then by default `git test` reports the old results rather than testing it again. This means that you can run the above command over and over as you work, and `git test` won't repeat tests whose results it already knows. (Of course there are options to allow you to request explicitly that commits be retested.)
 
