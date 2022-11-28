@@ -139,6 +139,7 @@ Some other features that would be nice:
 * `git test prune`: delete notes for obsolete trees.
 
 * Continuous testing mode, where `git test` watches the repository for changes and re-runs itself automatically whenever the commits it is watching change.
+  For now you can use the [run-continously.sh](run-continously.sh) script.
 
 * Dependencies between tests; for example:
 
