@@ -2,7 +2,9 @@
 
 `git-test` is a command-line script for running automated tests against commits in a Git repository. It is especially targeted at developers who like their tests to pass on *every* commit in a branch, not just the branch tip.
 
-The best way to use `git test` is to keep a window open in a second linked worktree of your repository, and as often as you like run
+The best way to use `git test` is to keep a window open in a second linked
+[worktree](#best-practice-use-git-test-in-a-linked-worktree) of your repository,
+and as often as you like run
 
     git test run master..mybranch
 
