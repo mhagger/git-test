@@ -800,7 +800,10 @@ def cmd_run(parser, options):
         sys.exit(2)
     else:
         if verbosity >= -1:
-            sys.stderr.write(colored('\nALL TESTS SUCCESSFUL\n', AnsiColor.GREEN))
+            sys.stderr.write('\n%s %s %s\n' %
+                (colored('ALL', AnsiColor.GREEN),
+                colored(test.name, AnsiColor.CYAN),
+                colored('TESTS SUCCESSFUL', AnsiColor.GREEN)))
         return
 
 
