@@ -400,7 +400,7 @@ def require_clean_work_tree(action):
 FAIL_HEADER_TEMPLATE = """\
 
 *******************************************************************************
-FAILED ON COMMIT %(revision)s
+BAD COMMIT %(revision)s: (%(tests)s)
 
 """
 
@@ -660,54 +660,86 @@ def iter_commits(parser, options):
             yield rev_parse('%s^{commit}' % (arg.strip(),))
 
 
-def run_in_dirty_tree(test, extra_env, options):
+def run_in_dirty_tree(tests, extra_env, options):
+    fail_count = 0
+
     try:
-        test.run(extra_env=extra_env)
-    except UserTestError as e:
-        sys.stdout.write(
-            'working-tree %s (%s:%s)\n' % (
-                good_bad_text('bad'), test.name, good_bad_text('bad'),
-            ),
-        )
-        if verbosity >= -1:
-            sys.stderr.write(
-                '\n%s\n' % (
-                    AnsiColor.RED('!!! TEST \'%s\' FAILED !!!' % (test.name,)),
-                ),
-            )
-        sys.exit(e.returncode)
-    else:
-        sys.stdout.write(
-            'working-tree %s (%s:%s)\n' % (
-                good_bad_text('good'), test.name, good_bad_text('good'),
-            ),
-        )
-        if verbosity >= -1:
-            sys.stderr.write(
-                '\n%s\n' % (
-                    AnsiColor.GREEN('TEST \'%s\' SUCCESSFUL' % (test.name,)),
-                ),
-            )
+        for test in tests:
+            extra_env['GIT_TEST_NAME'] = test.name
+            if verbosity >= 0:
+                sys.stderr.write(
+                    'Using test %s; command: %s\n' % (
+                        AnsiColor.CYAN(test.name),
+                        AnsiColor.CYAN(test.command),
+                    ),
+                )
+
+            try:
+                test.run(extra_env=extra_env)
+            except UserTestError as e:
+                sys.stdout.write(
+                    'working-tree %s (%s:%s)\n' % (
+                        good_bad_text('bad'), test.name, good_bad_text('bad'),
+                    ),
+                )
+                if verbosity >= -1:
+                    sys.stderr.write(
+                    '\n%s\n' % (
+                        AnsiColor.RED('!!! TEST \'%s\' FAILED !!!' % (test.name,)),
+                        ),
+                    )
+                fail_count += 1
+                if not options.keep_going:
+                    sys.exit(e.returncode)
+            else:
+                sys.stdout.write(
+                    'working-tree %s (%s:%s)\n' % (
+                        good_bad_text('good'), test.name, good_bad_text('good'),
+                    ),
+                )
+                if verbosity >= -1:
+                    sys.stderr.write(
+                        '\n%s\n' % (
+                            AnsiColor.GREEN('TEST \'%s\' SUCCESSFUL' % (test.name,)),
+                        ),
+                    )
     finally:
+        if len(tests) == 1:
+            # No need for a summary.
+            pass
+        elif fail_count > 0:
+            if verbosity >= -1:
+                if fail_count == 1:
+                    test_text = 'TEST'
+                else:
+                    test_text = 'TESTS'
+
+                sys.stderr.write(
+                    '\n%s\n' % (
+                        AnsiColor.RED('!!! %s %s FAILED !!!' % (fail_count, test_text)),
+                    ),
+                )
+
+            sys.exit(1)
+        else:
+            if verbosity >= -1:
+                sys.stderr.write(
+                    '\n%s\n' % (
+                        AnsiColor.GREEN('ALL TESTS SUCCESSFUL'),
+                    ),
+                )
+
         sys.stderr.write(
             'Note: working tree is dirty; results will not be saved.\n'
             )
 
 
 def cmd_run(parser, options):
-    test = Test(options.test)
     extra_env = {
-        'GIT_TEST_NAME' : test.name,
         'GIT_TEST_PREVIOUS_CHECKED_OUT_COMMIT' : None,
         'GIT_TEST_VERBOSITY' : str(verbosity),
     }
-
-    if verbosity >= 0:
-        sys.stderr.write(
-            'Using test \'%s\'; command: %s\n' % (
-                AnsiColor.CYAN(test.name), AnsiColor.CYAN(test.command),
-            ),
-        )
+    tests = [Test(test_name) for test_name in options.tests]
 
     try:
         require_clean_work_tree('test-run')
@@ -717,7 +749,7 @@ def cmd_run(parser, options):
         if options.commits or options.stdin or options.forget or options.dry_run:
             raise
 
-        run_in_dirty_tree(test, extra_env, options)
+        run_in_dirty_tree(tests, extra_env, options)
         return
 
     revisions = list(uniqify(iter_commits(parser, options)))
@@ -739,147 +771,186 @@ def cmd_run(parser, options):
         head = check_output(cmd).rstrip()
 
     if options.force or options.forget:
-        test.forget_status(revisions)
-
+        for test in tests:
+            if options.forget and verbosity >= 0:
+                sys.stderr.write(
+                    'Using test \'%s\'; command: %s\n' % (
+                        AnsiColor.CYAN(test.name), AnsiColor.CYAN(test.command),
+                    ),
+                )
+            test.forget_status(revisions)
         if options.forget:
             return
 
-    last_failure = None
     fail_count = 0
     unknown_count = 0
-
+    last_failure = None
     for r in revisions:
         cmd = ['git', 'rev-parse', '--short', r]
         rs = check_output(cmd).rstrip()
-        status = test.read_status(r, rs)
+        prepared = False
+        failed_tests = []
+        for test in tests:
+            extra_env['GIT_TEST_NAME'] = test.name
 
-        if status == 'good':
-            sys.stdout.write(
-                '%s^{tree} %s (%s:%s)\n' % (
-                    r, good_bad_text('good'), test.name, good_bad_text('known-good'),
-                ),
-            )
-            sys.stderr.write(
-                'Tree %s^{tree} is already known to be %s for test \'%s\'.\n' % (
-                    rs, good_bad_text('good'), test.name,
-                ),
-            )
+            status = test.read_status(r, rs)
 
-        elif status == 'bad':
-            if options.retest and not options.dry_run:
-                sys.stderr.write(
-                    'Tree %s^{tree} was previously tested to be %s for test \'%s\'; retesting...\n' % (
-                        rs, good_bad_text('bad'), test.name,
-                    ),
-                )
-                status = None
-                # fall through
-            else:
+            if status == 'good':
                 sys.stdout.write(
                     '%s^{tree} %s (%s:%s)\n' % (
-                        r, good_bad_text('bad'), test.name, good_bad_text('known-bad'),
+                        r, good_bad_text('good'), test.name, good_bad_text('known-good'),
                     ),
                 )
                 sys.stderr.write(
-                    'Tree %s^{tree} is already known to be %s for test \'%s\'!\n' % (
-                        rs, good_bad_text('bad'), test.name,
+                    'Tree %s^{tree} is already known to be %s for test \'%s\'.\n' % (
+                        rs, good_bad_text('good'), test.name,
                     ),
                 )
-                status = 'failed'
-                if options.keep_going:
-                    fail_count += 1
+
+            elif status == 'bad':
+                if options.retest and not options.dry_run:
+                    sys.stderr.write(
+                        'Tree %s^{tree} was previously tested to be %s for test \'%s\'; retesting...\n' % (
+                            rs, good_bad_text('bad'), test.name,
+                        ),
+                        )
+                    status = None
+                    # fall through
                 else:
-                    sys.exit(1)
+                    sys.stdout.write(
+                        '%s^{tree} %s (%s:%s)\n' % (
+                            r, good_bad_text('bad'), test.name, good_bad_text('known-bad'),
+                        ),
+                    )
+                    sys.stderr.write(
+                        'Tree %s^{tree} is already known to be %s for test \'%s\'!\n' % (
+                            rs, good_bad_text('bad'), test.name,
+                        ),
+                    )
+                    failed_tests.append('%s:known-bad' % (test.name,))
+                    fail_count += 1
+                    status = 'failed'
+                    if not options.keep_going:
+                        sys.exit(1)
 
-        elif status == 'unknown':
-            if options.dry_run:
-                sys.stdout.write(
-                    '%s^{tree} %s (%s:%s)\n' % (
-                        r, good_bad_text('unknown'), test.name, good_bad_text('unknown'),
-                    ),
-                )
-                unknown_count += 1
-            else:
-                status = None
+            elif status == 'unknown':
+                if options.dry_run:
+                    sys.stdout.write(
+                        '%s^{tree} %s (%s:%s)\n' % (
+                            r, good_bad_text('unknown'), test.name, good_bad_text('unknown'),
+                        ),
+                    )
+                    unknown_count += 1
+                else:
+                    status = None
 
-        if status is None:
-            if not testing_head:
-                prepare_revision(r)
+            if status is None:
+                if not testing_head and not prepared:
+                    prepare_revision(r)
+                    prepared = True
 
-            try:
-                test.run(extra_env=extra_env)
-            except UserTestError as e:
-                # This commit has failed the test.
-                sys.stdout.write(
-                    '%s^{tree} %s (%s:%s)\n' % (
-                        r, good_bad_text('bad'), test.name, good_bad_text('bad'),
-                    ),
-                )
-                if verbosity >= -1:
-                    sys.stderr.write(AnsiColor.RED(FAIL_HEADER_TEMPLATE % dict(revision=r)))
-                    cmd = ['git', '--no-pager', 'log', '-1', '--decorate', r]
-                    chatty_call(cmd, level=-1)
-                    sys.stderr.write(AnsiColor.RED(FAIL_TRAILER_TEMPLATE % dict()))
+                try:
+                    test.run(extra_env=extra_env)
+                except UserTestError as e:
+                    # This commit has failed the test.
+                    sys.stdout.write(
+                        '%s^{tree} %s (%s:%s)\n' % (
+                            r, good_bad_text('bad'), test.name, good_bad_text('bad'),
+                        ),
+                    )
+
                     test.write_status(r, 'bad')
 
-                if options.keep_going:
-                    last_failure = e.returncode
+                    failed_tests.append('%s:bad' % (test.name,))
                     fail_count += 1
-                else:
-                    sys.exit(e.returncode)
-            else:
-                sys.stdout.write(
-                    '%s^{tree} %s (%s:%s)\n' % (
-                        r, good_bad_text('good'), test.name, good_bad_text('good'),
-                    ),
-                )
-                test.write_status(r, 'good')
+                    last_failure = e.returncode
 
-            extra_env['GIT_TEST_PREVIOUS_CHECKED_OUT_COMMIT'] = r
+                    if not options.keep_going:
+                        if verbosity >= -1:
+                            sys.stderr.write(
+                                AnsiColor.RED(
+                                    FAIL_HEADER_TEMPLATE % dict(
+                                        revision=r,
+                                        tests=','.join(failed_tests),
+                                    ),
+                                ),
+                            )
+                            cmd = ['git', '--no-pager', 'log', '-1', '--decorate', r]
+                            chatty_call(cmd, level=-1)
+                            sys.stderr.write(AnsiColor.RED(FAIL_TRAILER_TEMPLATE % dict()))
+
+                        sys.exit(e.returncode)
+                else:
+                    sys.stdout.write(
+                        '%s^{tree} %s (%s:%s)\n' % (
+                            r, good_bad_text('good'), test.name, good_bad_text('good'),
+                        ),
+                    )
+                    test.write_status(r, 'good')
+
+                extra_env['GIT_TEST_PREVIOUS_CHECKED_OUT_COMMIT'] = r
+
+        if failed_tests and verbosity >= -1:
+            sys.stderr.write(
+                AnsiColor.RED(
+                    FAIL_HEADER_TEMPLATE % dict(
+                        revision=r,
+                        tests=','.join(failed_tests),
+                    ),
+                ),
+            )
+            cmd = ['git', '--no-pager', 'log', '-1', '--decorate', r]
+            chatty_call(cmd, level=-1)
+            sys.stderr.write(AnsiColor.RED(FAIL_TRAILER_TEMPLATE % dict()))
 
     if not testing_head:
         cmd = ['git', 'checkout', '-f', re.sub(r'^refs/heads/', '', head)]
         chatty_call(cmd)
 
-    if fail_count > 0:
-        if verbosity >= -1:
+    if verbosity >= -1:
+        # Write out an overall summary (number of tests failed/unknown):
+        if fail_count > 0:
             if fail_count == 1:
-                test_text = 'TEST'
+                sys.stderr.write(
+                    '\n%s\n' % (
+                        AnsiColor.RED('!!! %s TEST FAILED !!!' % (fail_count,)),
+                    ),
+                )
             else:
-                test_text = 'TESTS'
-            sys.stderr.write(
-                '\n%s: %s\n' % (
-                    AnsiColor.RED('!!! %s %s FAILED !!!' % (fail_count, test_text)),
-                    AnsiColor.CYAN(test.name),
-                ),
-            )
+                sys.stderr.write(
+                    '\n%s\n' % (
+                        AnsiColor.RED('!!! %s TESTS FAILED !!!' % (fail_count,)),
+                    ),
+                )
 
-        if last_failure is not None:
-            sys.exit(last_failure)
-        else:
-            sys.exit(1)
-    elif unknown_count > 0:
-        if verbosity >= -1:
+        if unknown_count > 0:
             if unknown_count == 1:
-                test_text = 'TEST'
+                sys.stderr.write(
+                    '\n%s\n' % (
+                        AnsiColor.YELLOW('%s TEST UNKNOWN' % (unknown_count,)),
+                    ),
+                )
             else:
-                test_text = 'TESTS'
-            sys.stderr.write(
-                '\n%s: %s\n' % (
-                    AnsiColor.YELLOW('%s %s UNKNOWN' % (unknown_count, test_text)),
-                    AnsiColor.CYAN(test.name),
-                ),
-            )
+                sys.stderr.write(
+                    '\n%s\n' % (
+                        AnsiColor.YELLOW('%s TESTS UNKNOWN' % (unknown_count,)),
+                    ),
+                )
 
-        sys.exit(2)
-    else:
-        if verbosity >= -1:
+        if fail_count == 0 and unknown_count == 0:
             sys.stderr.write(
                 '\n%s\n' % (
                     AnsiColor.GREEN('ALL TESTS SUCCESSFUL'),
                 ),
             )
-        return
+
+    if fail_count > 0:
+        if last_failure is not None:
+            sys.exit(last_failure)
+        else:
+            sys.exit(1)
+    elif unknown_count > 0:
+        sys.exit(2)
 
 
 def cmd_results(parser, options):
@@ -972,6 +1043,10 @@ def cmd_help(parser, options, subparsers):
     parser.exit()
 
 
+def csv(s):
+    return s.split(',')
+
+
 def main(args):
     global verbosity
 
@@ -1043,9 +1118,10 @@ def main(args):
 
     def add_run_arguments(subparser):
         subparser.add_argument(
-            '--test', '-t', metavar='name',
-            action='store', default='default',
-            help='name of test (default is \'default\')',
+            '--test', '--tests', '-t', metavar='name',
+            action='store', dest='tests',
+            type=csv, default=['default'],
+            help='comma-separated name(s) of test(s) (default is \'default\')',
             )
         subparser.add_argument(
             '--force', '-f', action='store_true',
