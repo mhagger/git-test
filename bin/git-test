@@ -401,6 +401,13 @@ FAIL_TRAILER_TEMPLATE = """\
 FAILURE!
 """
 
+class TestResult:
+    def __init__(self):
+        self.last_failure = None
+        self.fail_count = 0
+        self.unknown_count = 0
+        self.status = None
+
 class Test(object):
     def __init__(self, name, _command=None):
         self.name = name
@@ -721,44 +728,42 @@ def cmd_run(parser, options):
         if options.forget:
             return
 
-    last_failure = None
-    fail_count = 0
-    unknown_count = 0
+    result = TestResult()
 
     for r in revisions:
         cmd = ['git', 'rev-parse', '--short', r]
         rs = check_output(cmd).rstrip()
-        status = test.read_status(r, rs)
+        result.status = test.read_status(r, rs)
 
-        if status == 'good':
+        if result.status == 'good':
             sys.stdout.write('%s^{tree} %s\n' % (r, good_bad_text('known-good')))
             sys.stderr.write('Tree %s^{tree} is already known to be %s.\n' % (rs, good_bad_text('good')))
 
-        elif status == 'bad':
+        elif result.status == 'bad':
             if options.retest and not options.dry_run:
                 sys.stderr.write(
                     'Tree %s^{tree} was previously tested to be %s; retesting...\n'
                     % (rs, good_bad_text('bad'))
                     )
-                status = None
+                result.status = None
                 # fall through
             else:
                 sys.stdout.write('%s^{tree} %s\n' % (r, good_bad_text('known-bad')))
                 sys.stderr.write('Tree %s^{tree} is already known to be %s!\n' % (rs, good_bad_text('bad')))
-                status = 'failed'
+                result.status = 'failed'
                 if options.keep_going:
-                    fail_count += 1
+                    result.fail_count += 1
                 else:
                     sys.exit(1)
 
-        elif status == 'unknown':
+        elif result.status == 'unknown':
             if options.dry_run:
                 sys.stdout.write('%s^{tree} %s\n' % (r, good_bad_text('unknown')))
-                unknown_count += 1
+                result.unknown_count += 1
             else:
-                status = None
+                result.status = None
 
-        if status is None:
+        if result.status is None:
             if not testing_head:
                 prepare_revision(r)
 
@@ -767,8 +772,8 @@ def cmd_run(parser, options):
             except UserTestError as e:
                 # This commit has failed the test.
                 if options.keep_going:
-                    last_failure = e.returncode
-                    fail_count += 1
+                    result.last_failure = e.returncode
+                    result.fail_count += 1
                 else:
                     sys.exit(e.returncode)
             extra_env['GIT_TEST_PREVIOUS_CHECKED_OUT_COMMIT'] = r
@@ -777,25 +782,25 @@ def cmd_run(parser, options):
         cmd = ['git', 'checkout', '-f', re.sub(r'^refs/heads/', '', head)]
         chatty_call(cmd)
 
-    if fail_count > 0:
+    if result.fail_count > 0:
         if verbosity >= -1:
-            if fail_count == 1:
+            if result.fail_count == 1:
                 test_text = 'TEST'
             else:
                 test_text = 'TESTS'
-            sys.stderr.write(colored('\n!!! %s %s FAILED !!!\n' % (fail_count, test_text), AnsiColor.RED))
+            sys.stderr.write(colored('\n!!! %s %s FAILED !!!\n' % (result.fail_count, test_text), AnsiColor.RED))
 
-        if last_failure is not None:
-            sys.exit(last_failure)
+        if result.last_failure is not None:
+            sys.exit(result.last_failure)
         else:
             sys.exit(1)
-    elif unknown_count > 0:
+    elif result.unknown_count > 0:
         if verbosity >= -1:
-            if unknown_count == 1:
+            if result.unknown_count == 1:
                 test_text = 'TEST'
             else:
                 test_text = 'TESTS'
-            sys.stderr.write(colored('\n%s %s UNKNOWN\n' % (unknown_count, test_text), AnsiColor.YELLOW))
+            sys.stderr.write(colored('\n%s %s UNKNOWN\n' % (result.unknown_count, test_text), AnsiColor.YELLOW))
 
         sys.exit(2)
     else:
