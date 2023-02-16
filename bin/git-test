@@ -456,7 +456,7 @@ class Test(object):
             raise Fatal('fatal: error adding note to %s^{tree}' % (revision,))
         else:
             if verbosity >= 0:
-                sys.stderr.write('Marked tree %s^{tree} to be %s\n' % (revision, good_bad_text(value)))
+                sys.stderr.write('Marked tree %s^{tree} to be %s for test %s\n' % (revision, good_bad_text(value), colored(self.name, AnsiColor.CYAN)))
 
     def forget_status(self, revisions):
         """Forget the stored results (if any) for the specified revisions."""
@@ -742,19 +742,19 @@ def cmd_run(parser, options):
 
             if test.result.status == 'good':
                 sys.stdout.write('%s^{tree} %s\n' % (r, good_bad_text('known-good')))
-                sys.stderr.write('Tree %s^{tree} is already known to be %s.\n' % (rs, good_bad_text('good')))
+                sys.stderr.write('Tree %s^{tree} is already known to be %s for test %s.\n' % (rs, good_bad_text('good'), colored(test.name, AnsiColor.CYAN)))
 
             elif test.result.status == 'bad':
                 if options.retest and not options.dry_run:
                     sys.stderr.write(
-                        'Tree %s^{tree} was previously tested to be %s; retesting...\n'
-                        % (rs, good_bad_text('bad'))
+                        'Tree %s^{tree} was previously tested to be %s for test %s; retesting...\n'
+                        % (rs, good_bad_text('bad'), colored(test.name, AnsiColor.CYAN))
                         )
                     test.result.status = None
                     # fall through
                 else:
                     sys.stdout.write('%s^{tree} %s\n' % (r, good_bad_text('known-bad')))
-                    sys.stderr.write('Tree %s^{tree} is already known to be %s!\n' % (rs, good_bad_text('bad')))
+                    sys.stderr.write('Tree %s^{tree} is already known to be %s for test %s!\n' % (rs, good_bad_text('bad'), colored(test.name, AnsiColor.CYAN)))
                     test.result.status = 'failed'
                     if options.keep_going:
                         test.result.fail_count += 1
@@ -763,7 +763,7 @@ def cmd_run(parser, options):
 
             elif test.result.status == 'unknown':
                 if options.dry_run:
-                    sys.stdout.write('%s^{tree} %s\n' % (r, good_bad_text('unknown')))
+                    sys.stdout.write('Tree %s^{tree} is %s for test %s\n' % (rs, good_bad_text('unknown'), colored(test.name, AnsiColor.CYAN)))
                     test.result.unknown_count += 1
                 else:
                     test.result.status = None
