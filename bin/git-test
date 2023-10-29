@@ -878,9 +878,10 @@ def cmd_list(parser, options):
 
 
 def cmd_remove(parser, options):
-    test = Test(options.test)
+    tests = [Test(test_name) for test_name in options.test.split(',')]
+    for test in tests:
 
-    test.remove('Test results deleted by \'git test remove\'')
+        test.remove('Test results deleted by \'git test remove\'')
 
 
 def cmd_help(parser, options, subparsers):
