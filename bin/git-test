@@ -1024,9 +1024,9 @@ def cmd_list(parser, options):
 
 
 def cmd_remove(parser, options):
-    test = Test(options.test)
-
-    test.remove('Test results deleted by \'git test remove\'')
+    tests = [Test(test_name) for test_name in options.tests]
+    for test in tests:
+        test.remove('Test results deleted by \'git test remove\'')
 
 
 def cmd_help(parser, options, subparsers):
@@ -1246,9 +1246,10 @@ def main(args):
         help='remove a test definition and all of its stored results',
         )
     subparser.add_argument(
-        '--test', '-t', metavar='name',
-        action='store', default='default',
-        help='name of test to remove (default is \'default\')',
+        '--test', '--tests', '-t', metavar='name',
+        action='store', dest='tests',
+        type=csv, default=['default'],
+        help='comma-separated name(s) of test(s) to remove (default is \'default\')',
         )
     add_verbosity_options(subparser)
 
