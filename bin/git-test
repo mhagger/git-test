@@ -839,18 +839,19 @@ def cmd_results(parser, options):
 
 
 def cmd_forget_results(parser, options):
-    test = Test(options.test)
+    tests = [Test(test_name) for test_name in options.test.split(',')]
+    for test in tests:
 
-    cmd = ['git', 'config', 'test.%s.command' % (test.name,)]
-    try:
-        chatty_call(cmd)
-    except CalledProcessError:
-        # There is no test defined; simply delete the notes reference:
-        test.remove_status('Test results deleted by \'git test forget-results\'')
-    else:
-        test.initialize_status(
-            'Test results reinitialized by \'git test forget-results\''
-            )
+        cmd = ['git', 'config', 'test.%s.command' % (test.name,)]
+        try:
+            chatty_call(cmd)
+        except CalledProcessError:
+            # There is no test defined; simply delete the notes reference:
+            test.remove_status('Test results deleted by \'git test forget-results\'')
+        else:
+            test.initialize_status(
+                'Test results reinitialized by \'git test forget-results\''
+                )
 
 
 test_re = re.compile(r'^test\.(?P<name>.*)\.command$')
