@@ -986,18 +986,18 @@ def cmd_results(parser, options):
 
 
 def cmd_forget_results(parser, options):
-    test = Test(options.test)
-
-    cmd = ['git', 'config', 'test.%s.command' % (test.name,)]
-    try:
-        chatty_call(cmd)
-    except CalledProcessError:
-        # There is no test defined; simply delete the notes reference:
-        test.remove_status('Test results deleted by \'git test forget-results\'')
-    else:
-        test.initialize_status(
-            'Test results reinitialized by \'git test forget-results\''
-            )
+    tests = [Test(test_name) for test_name in options.tests]
+    for test in tests:
+        cmd = ['git', 'config', 'test.%s.command' % (test.name,)]
+        try:
+            chatty_call(cmd)
+        except CalledProcessError:
+            # There is no test defined; simply delete the notes reference:
+            test.remove_status('Test results deleted by \'git test forget-results\'')
+        else:
+            test.initialize_status(
+                'Test results reinitialized by \'git test forget-results\''
+                )
 
 
 test_re = re.compile(r'^test\.(?P<name>.*)\.command$')
@@ -1219,9 +1219,13 @@ def main(args):
         help='permanently forget stored results for a test',
         )
     subparser.add_argument(
-        '--test', '-t', metavar='name',
-        action='store', default='default',
-        help='name of test whose results should be forgotten (default is \'default\')',
+        '--test', '--tests', '-t', metavar='name',
+        action='store', dest='tests',
+        type=csv, default=['default'],
+        help=(
+            'comma-separated name(s) of test(s) whose results should be '
+            'forgotten (default is \'default\')'
+            ),
         )
     add_verbosity_options(subparser)
 
