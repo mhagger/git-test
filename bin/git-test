@@ -547,7 +547,7 @@ test_config_re = re.compile(r'^test\.(?P<name>.*)\.(?P<subkey>[^\.]+)$')
 def iter_tests():
     """Iterate over all tests that are defined in the git configuration."""
 
-    cmd = ['git', 'config', '--get-regexp', '--null', '^test\.']
+    cmd = ['git', 'config', '--get-regexp', '--null', r'^test\.']
     out = check_output(cmd)
     lines = [line for line in out.split('\0') if line]
 
