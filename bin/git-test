@@ -457,7 +457,11 @@ class Test(object):
             raise Fatal('fatal: error adding note to %s^{tree}' % (revision,))
         else:
             if verbosity >= 0:
-                sys.stderr.write('Marked tree %s^{tree} to be %s\n' % (revision, good_bad_text(value)))
+                sys.stderr.write(
+                    'Marked tree %s^{tree} to be %s for test \'%s\'\n' % (
+                        revision, good_bad_text(value), self.name,
+                    ),
+                )
 
     def forget_status(self, revisions):
         """Forget the stored results (if any) for the specified revisions."""
@@ -620,7 +624,9 @@ def cmd_add(parser, options):
                 # results and the user didn't explicitly ask for
                 # `--keep`; emit a warning in case the user forgot to
                 # `--forget`:
-                sys.stderr.write(AnsiColor.CYAN(REUSE_RESULTS_WARNING % dict(name=test.name)))
+                sys.stderr.write(
+                    AnsiColor.CYAN(REUSE_RESULTS_WARNING % dict(name=test.name)),
+                )
 
     if initialize:
         test.initialize_status('Test results initialized by \'git test add\'')
@@ -664,7 +670,11 @@ def run_in_dirty_tree(test, extra_env, options):
             ),
         )
         if verbosity >= -1:
-            sys.stderr.write(AnsiColor.RED('\n!!! TEST FAILED !!!\n'))
+            sys.stderr.write(
+                '\n%s\n' % (
+                    AnsiColor.RED('!!! TEST \'%s\' FAILED !!!' % (test.name,)),
+                ),
+            )
         sys.exit(e.returncode)
     else:
         sys.stdout.write(
@@ -673,7 +683,11 @@ def run_in_dirty_tree(test, extra_env, options):
             ),
         )
         if verbosity >= -1:
-            sys.stderr.write(AnsiColor.GREEN('\nTEST SUCCESSFUL\n'))
+            sys.stderr.write(
+                '\n%s\n' % (
+                    AnsiColor.GREEN('TEST \'%s\' SUCCESSFUL' % (test.name,)),
+                ),
+            )
     finally:
         sys.stderr.write(
             'Note: working tree is dirty; results will not be saved.\n'
@@ -689,7 +703,11 @@ def cmd_run(parser, options):
     }
 
     if verbosity >= 0:
-        sys.stderr.write('Using test %s; command: %s\n' % (AnsiColor.CYAN(test.name), AnsiColor.CYAN(test.command)))
+        sys.stderr.write(
+            'Using test \'%s\'; command: %s\n' % (
+                AnsiColor.CYAN(test.name), AnsiColor.CYAN(test.command),
+            ),
+        )
 
     try:
         require_clean_work_tree('test-run')
@@ -741,14 +759,19 @@ def cmd_run(parser, options):
                     r, good_bad_text('good'), test.name, good_bad_text('known-good'),
                 ),
             )
-            sys.stderr.write('Tree %s^{tree} is already known to be %s.\n' % (rs, good_bad_text('good')))
+            sys.stderr.write(
+                'Tree %s^{tree} is already known to be %s for test \'%s\'.\n' % (
+                    rs, good_bad_text('good'), test.name,
+                ),
+            )
 
         elif status == 'bad':
             if options.retest and not options.dry_run:
                 sys.stderr.write(
-                    'Tree %s^{tree} was previously tested to be %s; retesting...\n'
-                    % (rs, good_bad_text('bad'))
-                    )
+                    'Tree %s^{tree} was previously tested to be %s for test \'%s\'; retesting...\n' % (
+                        rs, good_bad_text('bad'), test.name,
+                    ),
+                )
                 status = None
                 # fall through
             else:
@@ -757,7 +780,11 @@ def cmd_run(parser, options):
                         r, good_bad_text('bad'), test.name, good_bad_text('known-bad'),
                     ),
                 )
-                sys.stderr.write('Tree %s^{tree} is already known to be %s!\n' % (rs, good_bad_text('bad')))
+                sys.stderr.write(
+                    'Tree %s^{tree} is already known to be %s for test \'%s\'!\n' % (
+                        rs, good_bad_text('bad'), test.name,
+                    ),
+                )
                 status = 'failed'
                 if options.keep_going:
                     fail_count += 1
@@ -820,7 +847,12 @@ def cmd_run(parser, options):
                 test_text = 'TEST'
             else:
                 test_text = 'TESTS'
-            sys.stderr.write(AnsiColor.RED('\n!!! %s %s FAILED !!!\n' % (fail_count, test_text)))
+            sys.stderr.write(
+                '\n%s: %s\n' % (
+                    AnsiColor.RED('!!! %s %s FAILED !!!' % (fail_count, test_text)),
+                    AnsiColor.CYAN(test.name),
+                ),
+            )
 
         if last_failure is not None:
             sys.exit(last_failure)
@@ -832,12 +864,21 @@ def cmd_run(parser, options):
                 test_text = 'TEST'
             else:
                 test_text = 'TESTS'
-            sys.stderr.write(AnsiColor.YELLOW('\n%s %s UNKNOWN\n' % (unknown_count, test_text)))
+            sys.stderr.write(
+                '\n%s: %s\n' % (
+                    AnsiColor.YELLOW('%s %s UNKNOWN' % (unknown_count, test_text)),
+                    AnsiColor.CYAN(test.name),
+                ),
+            )
 
         sys.exit(2)
     else:
         if verbosity >= -1:
-            sys.stderr.write(AnsiColor.GREEN('\nALL TESTS SUCCESSFUL\n'))
+            sys.stderr.write(
+                '\n%s\n' % (
+                    AnsiColor.GREEN('ALL TESTS SUCCESSFUL'),
+                ),
+            )
         return
 
 
