@@ -63,68 +63,77 @@ import re
 import subprocess
 import argparse
 
-class AnsiColor:
-    BLACK = '\033[0;30m'
-    RED = '\033[0;31m'
-    GREEN = '\033[0;32m'
-    YELLOW = '\033[0;33m'
-    BLUE = '\033[0;34m'
-    MAGENTA = '\033[0;35m'
-    CYAN = '\033[0;36m'
-    B_GRAY = '\033[0;37m'
-    D_GRAY = '\033[1;30m'
-    B_RED = '\033[1;31m'
-    B_GREEN = '\033[1;32m'
-    B_YELLOW = '\033[1;33m'
-    B_BLUE = '\033[1;34m'
-    B_MAGENTA = '\033[1;35m'
-    B_CYAN = '\033[1;36m'
-    WHITE = '\033[1;37m'
+
+class AnsiColor(str):
     END = '\033[0m'
 
     @classmethod
     def disable(cls):
-        cls.BLACK = ''
-        cls.RED = ''
-        cls.GREEN = ''
-        cls.YELLOW = ''
-        cls.BLUE = ''
-        cls.MAGENTA = ''
-        cls.CYAN = ''
-        cls.B_GRAY = ''
-        cls.D_GRAY = ''
-        cls.B_RED = ''
-        cls.B_GREEN = ''
-        cls.B_YELLOW = ''
-        cls.B_BLUE = ''
-        cls.B_MAGENTA = ''
-        cls.B_CYAN = ''
-        cls.WHITE = ''
-        cls.END = ''
+        def nocolor(s):
+            return s
 
-def colored(text, color):
-    """Super simple function similar to colored from https://pypi.org/project/termcolor/
+        cls.BLACK = nocolor
+        cls.RED = nocolor
+        cls.GREEN = nocolor
+        cls.YELLOW = nocolor
+        cls.BLUE = nocolor
+        cls.MAGENTA = nocolor
+        cls.CYAN = nocolor
+        cls.B_GRAY = nocolor
+        cls.D_GRAY = nocolor
+        cls.B_RED = nocolor
+        cls.B_GREEN = nocolor
+        cls.B_YELLOW = nocolor
+        cls.B_BLUE = nocolor
+        cls.B_MAGENTA = nocolor
+        cls.B_CYAN = nocolor
+        cls.WHITE = nocolor
+        cls.END = nocolor
 
-    Example:
-    print('Save changes? ' + colored('Yes', AnsiColor.GREEN) + '/' + colored('No', AnsiColor.RED))
-    """
-    if text[-1] == '\n':
-        return color + text[:-1] + AnsiColor.END + '\n'
-    else:
-        return color + text + AnsiColor.END
+    def __call__(self, text):
+        """Return a string that displays 'text' in the color of 'self'.
+
+        Note that these calls don't nest correctly.
+
+        """
+
+        if text[-1] == '\n':
+            return self + text[:-1] + AnsiColor.END + '\n'
+        else:
+            return '%s%s%s' % (self, text, AnsiColor.END)
+
+
+# Define class-level constants for the colors:
+AnsiColor.BLACK = AnsiColor('\033[0;30m')
+AnsiColor.RED = AnsiColor('\033[0;31m')
+AnsiColor.GREEN = AnsiColor('\033[0;32m')
+AnsiColor.YELLOW = AnsiColor('\033[0;33m')
+AnsiColor.BLUE = AnsiColor('\033[0;34m')
+AnsiColor.MAGENTA = AnsiColor('\033[0;35m')
+AnsiColor.CYAN = AnsiColor('\033[0;36m')
+AnsiColor.B_GRAY = AnsiColor('\033[0;37m')
+AnsiColor.D_GRAY = AnsiColor('\033[1;30m')
+AnsiColor.B_RED = AnsiColor('\033[1;31m')
+AnsiColor.B_GREEN = AnsiColor('\033[1;32m')
+AnsiColor.B_YELLOW = AnsiColor('\033[1;33m')
+AnsiColor.B_BLUE = AnsiColor('\033[1;34m')
+AnsiColor.B_MAGENTA = AnsiColor('\033[1;35m')
+AnsiColor.B_CYAN = AnsiColor('\033[1;36m')
+AnsiColor.WHITE = AnsiColor('\033[1;37m')
+
 
 def good_bad_text(value):
     if value == 'good' or value == 'known-good':
-        return colored(value, AnsiColor.GREEN)
+        return AnsiColor.GREEN(value)
     if value == 'bad' or value == 'known-bad':
-        return colored(value, AnsiColor.RED)
+        return AnsiColor.RED(value)
     if value == 'unknown':
-        return colored(value, AnsiColor.YELLOW)
+        return AnsiColor.YELLOW(value)
     return value
 
 
 if not (0x02060000 <= sys.hexversion):
-    sys.stderr.write(colored('fatal: Python version 2.6 or later is required', AnsiColor.RED))
+    sys.stderr.write(AnsiColor.RED('fatal: Python version 2.6 or later is required'))
     sys.exit(125)
 
 
@@ -517,10 +526,10 @@ class Test(object):
         except UserTestError:
             sys.stdout.write('%s^{tree} %s\n' % (revision, good_bad_text('bad')))
             if verbosity >= -1:
-                sys.stderr.write(colored(FAIL_HEADER_TEMPLATE % dict(revision=revision), AnsiColor.RED))
+                sys.stderr.write(AnsiColor.RED(FAIL_HEADER_TEMPLATE % dict(revision=revision)))
                 cmd = ['git', '--no-pager', 'log', '-1', '--decorate', revision]
                 chatty_call(cmd, level=-1)
-                sys.stderr.write(colored(FAIL_TRAILER_TEMPLATE % dict(), AnsiColor.RED))
+                sys.stderr.write(AnsiColor.RED(FAIL_TRAILER_TEMPLATE % dict()))
                 self.write_status(revision, 'bad')
             raise
         else:
@@ -627,7 +636,7 @@ def cmd_add(parser, options):
                 # results and the user didn't explicitly ask for
                 # `--keep`; emit a warning in case the user forgot to
                 # `--forget`:
-                sys.stderr.write(colored(REUSE_RESULTS_WARNING % dict(name=test.name), AnsiColor.CYAN))
+                sys.stderr.write(AnsiColor.CYAN(REUSE_RESULTS_WARNING % dict(name=test.name)))
 
     if initialize:
         test.initialize_status('Test results initialized by \'git test add\'')
@@ -670,7 +679,7 @@ def cmd_run(parser, options):
     }
 
     if verbosity >= 0:
-        sys.stderr.write('Using test %s; command: %s\n' % (colored(test.name, AnsiColor.CYAN), colored(test.command, AnsiColor.CYAN)))
+        sys.stderr.write('Using test %s; command: %s\n' % (AnsiColor.CYAN(test.name), AnsiColor.CYAN(test.command)))
 
     try:
         require_clean_work_tree('test-run')
@@ -685,12 +694,12 @@ def cmd_run(parser, options):
         except UserTestError as e:
             sys.stdout.write('working-tree %s\n' % good_bad_text('bad'))
             if verbosity >= -1:
-                sys.stderr.write(colored('\n!!! TEST FAILED !!!\n', AnsiColor.RED))
+                sys.stderr.write(AnsiColor.RED('\n!!! TEST FAILED !!!\n'))
             sys.exit(e.returncode)
         else:
             sys.stdout.write('working-tree %s\n' % good_bad_text('good'))
             if verbosity >= -1:
-                sys.stderr.write(colored('\nTEST SUCCESSFUL\n', AnsiColor.GREEN))
+                sys.stderr.write(AnsiColor.GREEN('\nTEST SUCCESSFUL\n'))
         finally:
             sys.stderr.write(
                 'Note: working tree is dirty; results will not be saved.\n'
@@ -783,7 +792,7 @@ def cmd_run(parser, options):
                 test_text = 'TEST'
             else:
                 test_text = 'TESTS'
-            sys.stderr.write(colored('\n!!! %s %s FAILED !!!\n' % (fail_count, test_text), AnsiColor.RED))
+            sys.stderr.write(AnsiColor.RED('\n!!! %s %s FAILED !!!\n' % (fail_count, test_text)))
 
         if last_failure is not None:
             sys.exit(last_failure)
@@ -795,12 +804,12 @@ def cmd_run(parser, options):
                 test_text = 'TEST'
             else:
                 test_text = 'TESTS'
-            sys.stderr.write(colored('\n%s %s UNKNOWN\n' % (unknown_count, test_text), AnsiColor.YELLOW))
+            sys.stderr.write(AnsiColor.YELLOW('\n%s %s UNKNOWN\n' % (unknown_count, test_text)))
 
         sys.exit(2)
     else:
         if verbosity >= -1:
-            sys.stderr.write(colored('\nALL TESTS SUCCESSFUL\n', AnsiColor.GREEN))
+            sys.stderr.write(AnsiColor.GREEN('\nALL TESTS SUCCESSFUL\n'))
         return
 
 
@@ -1142,7 +1151,7 @@ if __name__ == '__main__':
     try:
         main(sys.argv[1:])
     except Fatal as e:
-        sys.stderr.write(colored('\nERROR!\n%s\n\n' % (e,), AnsiColor.RED))
+        sys.stderr.write(AnsiColor.RED('\nERROR!\n%s\n\n' % (e,)))
         sys.exit(125)
 
 
