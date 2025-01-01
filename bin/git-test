@@ -658,12 +658,20 @@ def run_in_dirty_tree(test, extra_env, options):
     try:
         test.run(extra_env=extra_env)
     except UserTestError as e:
-        sys.stdout.write('working-tree %s\n' % good_bad_text('bad'))
+        sys.stdout.write(
+            'working-tree %s (%s:%s)\n' % (
+                good_bad_text('bad'), test.name, good_bad_text('bad'),
+            ),
+        )
         if verbosity >= -1:
             sys.stderr.write(AnsiColor.RED('\n!!! TEST FAILED !!!\n'))
         sys.exit(e.returncode)
     else:
-        sys.stdout.write('working-tree %s\n' % good_bad_text('good'))
+        sys.stdout.write(
+            'working-tree %s (%s:%s)\n' % (
+                good_bad_text('good'), test.name, good_bad_text('good'),
+            ),
+        )
         if verbosity >= -1:
             sys.stderr.write(AnsiColor.GREEN('\nTEST SUCCESSFUL\n'))
     finally:
@@ -728,7 +736,11 @@ def cmd_run(parser, options):
         status = test.read_status(r, rs)
 
         if status == 'good':
-            sys.stdout.write('%s^{tree} %s\n' % (r, good_bad_text('known-good')))
+            sys.stdout.write(
+                '%s^{tree} %s (%s:%s)\n' % (
+                    r, good_bad_text('good'), test.name, good_bad_text('known-good'),
+                ),
+            )
             sys.stderr.write('Tree %s^{tree} is already known to be %s.\n' % (rs, good_bad_text('good')))
 
         elif status == 'bad':
@@ -740,7 +752,11 @@ def cmd_run(parser, options):
                 status = None
                 # fall through
             else:
-                sys.stdout.write('%s^{tree} %s\n' % (r, good_bad_text('known-bad')))
+                sys.stdout.write(
+                    '%s^{tree} %s (%s:%s)\n' % (
+                        r, good_bad_text('bad'), test.name, good_bad_text('known-bad'),
+                    ),
+                )
                 sys.stderr.write('Tree %s^{tree} is already known to be %s!\n' % (rs, good_bad_text('bad')))
                 status = 'failed'
                 if options.keep_going:
@@ -750,7 +766,11 @@ def cmd_run(parser, options):
 
         elif status == 'unknown':
             if options.dry_run:
-                sys.stdout.write('%s^{tree} %s\n' % (r, good_bad_text('unknown')))
+                sys.stdout.write(
+                    '%s^{tree} %s (%s:%s)\n' % (
+                        r, good_bad_text('unknown'), test.name, good_bad_text('unknown'),
+                    ),
+                )
                 unknown_count += 1
             else:
                 status = None
@@ -763,7 +783,11 @@ def cmd_run(parser, options):
                 test.run(extra_env=extra_env)
             except UserTestError as e:
                 # This commit has failed the test.
-                sys.stdout.write('%s^{tree} %s\n' % (r, good_bad_text('bad')))
+                sys.stdout.write(
+                    '%s^{tree} %s (%s:%s)\n' % (
+                        r, good_bad_text('bad'), test.name, good_bad_text('bad'),
+                    ),
+                )
                 if verbosity >= -1:
                     sys.stderr.write(AnsiColor.RED(FAIL_HEADER_TEMPLATE % dict(revision=r)))
                     cmd = ['git', '--no-pager', 'log', '-1', '--decorate', r]
@@ -777,7 +801,11 @@ def cmd_run(parser, options):
                 else:
                     sys.exit(e.returncode)
             else:
-                sys.stdout.write('%s^{tree} %s\n' % (r, good_bad_text('good')))
+                sys.stdout.write(
+                    '%s^{tree} %s (%s:%s)\n' % (
+                        r, good_bad_text('good'), test.name, good_bad_text('good'),
+                    ),
+                )
                 test.write_status(r, 'good')
 
             extra_env['GIT_TEST_PREVIOUS_CHECKED_OUT_COMMIT'] = r
@@ -827,11 +855,23 @@ def cmd_results(parser, options):
     for r in revisions:
         status = test.read_status(r)
         if status == 'good':
-            sys.stdout.write('%s^{tree} %s\n' % (r, good_bad_text('known-good')))
+            sys.stdout.write(
+                '%s^{tree} %s (%s:%s)\n' % (
+                    r, good_bad_text('good'), test.name, good_bad_text('known-good'),
+                ),
+            )
         elif status == 'bad':
-            sys.stdout.write('%s^{tree} %s\n' % (r, good_bad_text('known-bad')))
+            sys.stdout.write(
+                '%s^{tree} %s (%s:%s)\n' % (
+                    r, good_bad_text('bad'), test.name, good_bad_text('known-bad'),
+                ),
+            )
         elif status == 'unknown':
-            sys.stdout.write('%s^{tree} %s\n' % (r, good_bad_text('unknown')))
+            sys.stdout.write(
+                '%s^{tree} %s (%s:%s)\n' % (
+                    r, good_bad_text('unknown'), test.name, good_bad_text('unknown'),
+                ),
+            )
 
 
 def cmd_forget_results(parser, options):
