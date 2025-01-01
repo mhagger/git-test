@@ -331,13 +331,13 @@ test_expect_success 'default (failing-4-7-8): test passing dirty working copy' '
 	test_must_fail git notes --ref=tests/default show $c4^{tree}
 '
 
-test_expect_success 'default (failing-4-7-8): cannot test dirty working copy woth --dry-run' '
+test_expect_success 'default (failing-4-7-8): cannot test dirty working copy with --dry-run' '
 	echo 111 >number &&
 	test_when_finished "git reset --hard HEAD" &&
 	test_expect_code 125 git-test run --dry-run
 '
 
-test_expect_success 'default (failing-4-7-8): cannot test dirty working copy woth --forget' '
+test_expect_success 'default (failing-4-7-8): cannot test dirty working copy with --forget' '
 	echo 111 >number &&
 	test_when_finished "git reset --hard HEAD" &&
 	test_expect_code 125 git-test run --forget
