@@ -670,6 +670,24 @@ def iter_commits(parser, options):
             yield rev_parse('%s^{commit}' % (arg.strip(),))
 
 
+def run_in_dirty_tree(test, extra_env, options):
+    try:
+        test.run(extra_env=extra_env)
+    except UserTestError as e:
+        sys.stdout.write('working-tree %s\n' % good_bad_text('bad'))
+        if verbosity >= -1:
+            sys.stderr.write(AnsiColor.RED('\n!!! TEST FAILED !!!\n'))
+        sys.exit(e.returncode)
+    else:
+        sys.stdout.write('working-tree %s\n' % good_bad_text('good'))
+        if verbosity >= -1:
+            sys.stderr.write(AnsiColor.GREEN('\nTEST SUCCESSFUL\n'))
+    finally:
+        sys.stderr.write(
+            'Note: working tree is dirty; results will not be saved.\n'
+            )
+
+
 def cmd_run(parser, options):
     test = Test(options.test)
     extra_env = {
@@ -689,21 +707,7 @@ def cmd_run(parser, options):
         if options.commits or options.stdin or options.forget or options.dry_run:
             raise
 
-        try:
-            test.run(extra_env=extra_env)
-        except UserTestError as e:
-            sys.stdout.write('working-tree %s\n' % good_bad_text('bad'))
-            if verbosity >= -1:
-                sys.stderr.write(AnsiColor.RED('\n!!! TEST FAILED !!!\n'))
-            sys.exit(e.returncode)
-        else:
-            sys.stdout.write('working-tree %s\n' % good_bad_text('good'))
-            if verbosity >= -1:
-                sys.stderr.write(AnsiColor.GREEN('\nTEST SUCCESSFUL\n'))
-        finally:
-            sys.stderr.write(
-                'Note: working tree is dirty; results will not be saved.\n'
-                )
+        run_in_dirty_tree(test, extra_env, options)
         return
 
     revisions = list(uniqify(iter_commits(parser, options)))
