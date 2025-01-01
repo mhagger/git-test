@@ -520,22 +520,6 @@ class Test(object):
         except CalledProcessError as e:
             raise UserTestError(e.returncode, e.cmd, e.output)
 
-    def run_and_record(self, revision, extra_env={}):
-        try:
-            self.run(extra_env=extra_env)
-        except UserTestError:
-            sys.stdout.write('%s^{tree} %s\n' % (revision, good_bad_text('bad')))
-            if verbosity >= -1:
-                sys.stderr.write(AnsiColor.RED(FAIL_HEADER_TEMPLATE % dict(revision=revision)))
-                cmd = ['git', '--no-pager', 'log', '-1', '--decorate', revision]
-                chatty_call(cmd, level=-1)
-                sys.stderr.write(AnsiColor.RED(FAIL_TRAILER_TEMPLATE % dict()))
-                self.write_status(revision, 'bad')
-            raise
-        else:
-            sys.stdout.write('%s^{tree} %s\n' % (revision, good_bad_text('good')))
-            self.write_status(revision, 'good')
-
     def remove_status(self, msg):
         """Delete the note reference for this test."""
 
@@ -776,14 +760,26 @@ def cmd_run(parser, options):
                 prepare_revision(r)
 
             try:
-                test.run_and_record(r, extra_env=extra_env)
+                test.run(extra_env=extra_env)
             except UserTestError as e:
                 # This commit has failed the test.
+                sys.stdout.write('%s^{tree} %s\n' % (r, good_bad_text('bad')))
+                if verbosity >= -1:
+                    sys.stderr.write(AnsiColor.RED(FAIL_HEADER_TEMPLATE % dict(revision=r)))
+                    cmd = ['git', '--no-pager', 'log', '-1', '--decorate', r]
+                    chatty_call(cmd, level=-1)
+                    sys.stderr.write(AnsiColor.RED(FAIL_TRAILER_TEMPLATE % dict()))
+                    test.write_status(r, 'bad')
+
                 if options.keep_going:
                     last_failure = e.returncode
                     fail_count += 1
                 else:
                     sys.exit(e.returncode)
+            else:
+                sys.stdout.write('%s^{tree} %s\n' % (r, good_bad_text('good')))
+                test.write_status(r, 'good')
+
             extra_env['GIT_TEST_PREVIOUS_CHECKED_OUT_COMMIT'] = r
 
     if not testing_head:
