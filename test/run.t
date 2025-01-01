@@ -528,8 +528,8 @@ test_expect_success 'default (retcodes): list results' '
 	gen_stdout \
 		   c2 "unknown (default:unknown)" \
 		   c3 "unknown (default:unknown)" \
-		   c4 "good (default:known-good)" \
-		   c5 "bad (default:known-bad)" \
+		   c4 "good (default:good)" \
+		   c5 "bad (default:bad)" \
 		   c6 "unknown (default:unknown)" \
 		   c7 "unknown (default:unknown)" \
 		   c8 "unknown (default:unknown)" \

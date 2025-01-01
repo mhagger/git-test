@@ -953,10 +953,9 @@ def cmd_run(parser, options):
 
 
 def cmd_results(parser, options):
-    test = Test(options.test)
+    tests = [Test(test_name) for test_name in options.tests]
 
     revisions = list(uniqify(iter_commits(parser, options)))
-
     if not revisions:
         sys.stderr.write('NO COMMITS SPECIFIED! (so none failed)\n')
         return
@@ -964,25 +963,27 @@ def cmd_results(parser, options):
         revisions = [rev_parse('HEAD')]
 
     for r in revisions:
-        status = test.read_status(r)
-        if status == 'good':
-            sys.stdout.write(
-                '%s^{tree} %s (%s:%s)\n' % (
-                    r, good_bad_text('good'), test.name, good_bad_text('known-good'),
-                ),
-            )
-        elif status == 'bad':
-            sys.stdout.write(
-                '%s^{tree} %s (%s:%s)\n' % (
-                    r, good_bad_text('bad'), test.name, good_bad_text('known-bad'),
-                ),
-            )
-        elif status == 'unknown':
-            sys.stdout.write(
-                '%s^{tree} %s (%s:%s)\n' % (
-                    r, good_bad_text('unknown'), test.name, good_bad_text('unknown'),
-                ),
-            )
+        overall_status = 'good'
+        per_test_status = []
+        for test in tests:
+            status = test.read_status(r)
+            if status == 'good':
+                per_test_status.append('%s:%s' % (AnsiColor.CYAN(test.name), AnsiColor.GREEN(status)))
+            elif status == 'bad':
+                per_test_status.append('%s:%s' % (AnsiColor.CYAN(test.name), AnsiColor.RED(status)))
+                overall_status = 'bad'
+            elif status == 'unknown':
+                per_test_status.append('%s:%s' % (AnsiColor.CYAN(test.name), AnsiColor.YELLOW(status)))
+                if overall_status == 'good':
+                    overall_status = 'unknown'
+
+        per_test_status = ' '.join(per_test_status)
+
+        sys.stdout.write(
+            '%s^{tree} %s (%s)\n' % (
+                r, good_bad_text(overall_status), per_test_status,
+            ),
+        )
 
 
 def cmd_forget_results(parser, options):
@@ -1195,9 +1196,10 @@ def main(args):
         help='show any stored test results for the specified commits',
         )
     subparser.add_argument(
-        '--test', '-t', metavar='name',
-        action='store', default='default',
-        help='name of test (default is \'default\')',
+        '--test', '--tests', '-t', metavar='name',
+        action='store', dest='tests',
+        type=csv, default=['default'],
+        help='comma-separated name(s) of test(s) (default is \'default\')',
         )
     subparser.add_argument(
         '--stdin', action='store_true',
