@@ -539,7 +539,7 @@ test_expect_success 'default (retcodes): list results' '
 	test_must_fail test -f numbers.log
 '
 
-test_expect_success 'default (retcodes): keep-going: retcode wins if last' '
+test_expect_success 'default (retcodes): keep-going: retcode is always 1' '
 	rm -f numbers.log &&
 	gen_stdout \
 		   c2 "good (default:good)" \
@@ -548,7 +548,7 @@ test_expect_success 'default (retcodes): keep-going: retcode wins if last' '
 		   c5 "bad (default:bad)" \
 		   c6 "good (default:good)" \
 		   >expected-stdout &&
-	test_expect_code 42 git-test run --force --keep-going c1..c6 >actual-stdout &&
+	test_expect_code 1 git-test run --force --keep-going c1..c6 >actual-stdout &&
 	test_cmp expected-stdout actual-stdout &&
 	printf "default %s${LF}" 2 3 4 5 6 >expected &&
 	test_cmp expected numbers.log

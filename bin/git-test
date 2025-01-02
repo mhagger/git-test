@@ -684,8 +684,12 @@ def run_in_dirty_tree(tests, extra_env, options):
                 )
                 if verbosity >= -1:
                     sys.stderr.write(
-                    '\n%s\n' % (
-                        AnsiColor.RED('!!! TEST \'%s\' FAILED !!!' % (test.name,)),
+                        '\n%s\n' % (
+                            AnsiColor.RED(
+                                '!!! TEST \'%s\' FAILED (retcode=%d) !!!' % (
+                                    test.name, e.returncode,
+                                ),
+                            ),
                         ),
                     )
                 fail_count += 1
@@ -784,7 +788,6 @@ def cmd_run(parser, options):
 
     fail_count = 0
     unknown_count = 0
-    last_failure = None
     for r in revisions:
         cmd = ['git', 'rev-parse', '--short', r]
         rs = check_output(cmd).rstrip()
@@ -861,9 +864,8 @@ def cmd_run(parser, options):
 
                     test.write_status(r, 'bad')
 
-                    failed_tests.append('%s:bad' % (test.name,))
+                    failed_tests.append('%s:bad:retcode=%d' % (test.name, e.returncode,))
                     fail_count += 1
-                    last_failure = e.returncode
 
                     if not options.keep_going:
                         if verbosity >= -1:
@@ -945,10 +947,7 @@ def cmd_run(parser, options):
             )
 
     if fail_count > 0:
-        if last_failure is not None:
-            sys.exit(last_failure)
-        else:
-            sys.exit(1)
+        sys.exit(1)
     elif unknown_count > 0:
         sys.exit(2)
 
